@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment files (the example is intentionally committed)
+.env
+.env.*
+!.env.example
+
+# Build and test output
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright-browsers/
+*.tsbuildinfo
+
+# Runtime files
+*.log
+*.pid
+.DS_Store
+Thumbs.db
+
+# Local tooling
+.idea/
+.vscode/
+
+# Local object-storage and database data
+.data/

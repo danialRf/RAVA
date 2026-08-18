@@ -1,0 +1,91 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+
+import { AccountNav } from "../../../../components/account";
+import { PageIntro } from "../../../../components/storefront";
+import { formatToman } from "../../../../lib/format";
+import { currentUser } from "../../../../server/auth";
+import { readOwnedOrder } from "../../../../server/checkout";
+
+export const metadata = {
+  title: "جزئیات سفارش",
+  robots: { index: false, follow: false },
+};
+
+const statusLabels: Record<string, string> = {
+  DEPOSIT_PENDING: "در انتظار پیش‌پرداخت",
+  PROCUREMENT_PENDING: "پیش‌پرداخت تأیید شد؛ در صف تهیه",
+  DEPOSIT_PAID: "پیش‌پرداخت تأیید شد",
+};
+
+export default async function OrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const user = await currentUser();
+  if (!user) redirect("/account/login");
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const result = await readOwnedOrder(id, user.id);
+  if (!result) notFound();
+  return (
+    <div className="section-shell account-page order-page">
+      <PageIntro
+        eyebrow="سفارش من"
+        title={result.order.orderNumber}
+        copy={statusLabels[result.order.status] ?? "سفارش ثبت شده است."}
+      />
+      <AccountNav />
+      {query.notice === "paid" && (
+        <p className="form-message notice">پیش‌پرداخت با موفقیت تأیید شد.</p>
+      )}
+      {query.notice === "receipt" && (
+        <p className="form-message notice">
+          رسید دریافت شد و در انتظار بررسی مالی است.
+        </p>
+      )}
+      {query.error && (
+        <p className="form-message error">
+          پرداخت تأیید نشد؛ مبلغی در سفارش ثبت نشده است.
+        </p>
+      )}
+      <div className="order-overview">
+        <section>
+          <h2>کالاها</h2>
+          {result.items.map((item) => (
+            <article key={item.id}>
+              <div>
+                <strong>{item.productSnapshot.titleFa}</strong>
+                <span>
+                  {item.productSnapshot.brand} ·{" "}
+                  {item.productSnapshot.variant.label}
+                </span>
+              </div>
+              <strong>{formatToman(item.lineTotalToman)} تومان</strong>
+            </article>
+          ))}
+        </section>
+        <aside>
+          <h2>خلاصه مالی</h2>
+          <dl>
+            <div>
+              <dt>مبلغ قفل‌شده</dt>
+              <dd>{formatToman(result.order.totalLockedToman)} تومان</dd>
+            </div>
+            <div>
+              <dt>پیش‌پرداخت</dt>
+              <dd>{formatToman(result.order.depositRequiredToman)} تومان</dd>
+            </div>
+            <div>
+              <dt>پرداخت‌شده</dt>
+              <dd>{formatToman(result.order.depositPaidToman)} تومان</dd>
+            </div>
+          </dl>
+          <Link href="/account">بازگشت به حساب</Link>
+        </aside>
+      </div>
+    </div>
+  );
+}

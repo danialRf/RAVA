@@ -1,0 +1,42 @@
+{
+  "name": "rava",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @rava/web --filter @rava/worker dev",
+    "build": "pnpm --recursive --if-present --filter \"@rava/*\" build",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm --recursive --if-present --filter \"@rava/*\" typecheck",
+    "test": "vitest run",
+    "test:unit": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/*.integration.test.ts\"",
+    "pretest:e2e": "pnpm --filter @rava/web build",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "worker:smoke": "node scripts/smoke-worker.mjs",
+    "db:generate": "pnpm --filter @rava/db db:generate",
+    "db:migrate": "pnpm --filter @rava/db db:migrate",
+    "db:seed": "pnpm --filter @rava/db db:seed",
+    "infra:up": "docker compose up -d --wait postgres redis minio && docker compose run --rm minio-init",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.2",
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.3.1",
+    "prettier": "3.9.6",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.10"
+  }
+}

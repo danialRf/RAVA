@@ -1,0 +1,1 @@
+Fix every BLOCKER and HIGH-severity issue in the review I provide below. Do not add unrelated features or refactor stable code without a concrete reason. Re-run all affected tests, typecheck/lint, and relevant Playwright flows. Update PROJECT_STATE.md. Then summarize each review item and how it was resolved.

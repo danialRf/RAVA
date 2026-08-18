@@ -1,0 +1,32 @@
+:root {
+  --rava-ivory: #f8eee3;
+  --rava-paper: #fffaf5;
+  --rava-ink: #202123;
+  --rava-muted-ink: #67645f;
+  --rava-border: #ead9ca;
+  --rava-burgundy: #9a4659;
+  --rava-burgundy-dark: #672f40;
+  --rava-sage: #617168;
+  --rava-sage-soft: #e7ece8;
+  --rava-sand: #dfc9aa;
+  --rava-gold: #caa664;
+  --rava-gold-soft: #edd9ae;
+  --rava-gold-pale: #f7ead0;
+  --rava-gold-deep: #775726;
+  --rava-rose: #d86676;
+  --rava-rose-soft: #f5d9db;
+  --rava-peach: #efb8a8;
+  --rava-peach-soft: #f8e2d8;
+  --rava-lilac-soft: #e7dcf1;
+  --rava-sale-soft: #f5d9df;
+  --rava-warning: #9a6b35;
+  --rava-success: #3f6654;
+  --rava-error: #a43d43;
+  --rava-shadow-soft: 0 14px 38px rgba(91, 68, 43, 0.08);
+  --rava-shadow-lifted: 0 20px 52px rgba(91, 68, 43, 0.13);
+  --rava-radius-card: 18px;
+  --rava-radius-control: 11px;
+  --rava-font-sans:
+    "Vazirmatn Variable", "Vazirmatn", "B Vazir", Tahoma, Arial, sans-serif;
+  --rava-font-latin: Inter, Arial, sans-serif;
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@rava/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/vazirmatn": "5.2.6",
+    "@rava/config": "workspace:*",
+    "@rava/db": "workspace:*",
+    "@rava/domain": "workspace:*",
+    "@rava/integrations": "workspace:*",
+    "@rava/ui": "workspace:*",
+    "next": "16.3.1",
+    "oslo": "1.2.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "typescript": "5.9.3"
+  }
+}

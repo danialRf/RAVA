@@ -1,0 +1,13 @@
+.next
+dist
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+AGENTS.md
+MASTER_PROMPT.md
+README_FIRST.md
+MANIFEST.json
+docs
+prompts
+templates

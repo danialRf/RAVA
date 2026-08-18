@@ -1,0 +1,1 @@
+Read AGENTS.md, MASTER_PROMPT.md, all files in docs/, and docs/PROJECT_STATE.md. Then execute prompts/00_BOOTSTRAP.md completely. Do not stop after giving me a plan. Use fake/local providers for missing external credentials. Run every required verification, fix failures, update PROJECT_STATE.md, and give me the completion report defined in MASTER_PROMPT.md.

@@ -1,0 +1,1 @@
+Read AGENTS.md, the relevant project specs, and PROJECT_STATE.md. Execute the next phase prompt completely. Do not broaden scope. Preserve existing architecture and visual language. Run tests, fix failures, update PROJECT_STATE.md, and report exactly what changed.
