@@ -24,7 +24,7 @@ import { createPaymentGateway } from "@rava/integrations";
 import { usesHttps } from "../lib/site";
 import { currentUser } from "./auth";
 import { database } from "./db";
-import { estimateFor, getCheckoutRate } from "./pricing";
+import { estimateFor, getCheckoutRate, type CheckoutRate } from "./pricing";
 
 const CART_COOKIE = "rava_cart";
 const CART_COOKIE_SECONDS = 60 * 60 * 24 * 30;
@@ -99,11 +99,12 @@ function variantLabel(
   return parts.join(" · ") || item.variantSku;
 }
 
-export async function readCartModel() {
+export async function readCartModel(checkoutRate?: CheckoutRate | null) {
   const cart = await getCurrentCart();
   if (!cart) return { cart: null, items: [], total: 0n, deposit: 0n } as const;
   const rows = await listCartDetails(database(), cart.id);
-  const rate = await getCheckoutRate();
+  const rate =
+    checkoutRate === undefined ? await getCheckoutRate() : checkoutRate;
   const items = await Promise.all(
     rows.map(async (row) => {
       const estimate =
@@ -147,12 +148,13 @@ export async function readCartModel() {
 }
 
 export async function createFreshQuote(userId: string) {
-  const model = await readCartModel();
+  // A quote must be calculated and persisted from one immutable FX snapshot.
+  const rate = await getCheckoutRate();
+  if (!rate) throw new Error("FX_UNAVAILABLE");
+  const model = await readCartModel(rate);
   if (!model.cart || model.items.length === 0) throw new Error("CART_EMPTY");
   if (model.items.some((item) => item.estimate === null))
     throw new Error("ITEM_UNAVAILABLE");
-  const rate = await getCheckoutRate();
-  if (!rate) throw new Error("FX_UNAVAILABLE");
   const lines = model.items.map((item) => {
     const estimate = item.estimate!;
     const quantity = BigInt(item.quantity);
@@ -217,9 +219,10 @@ export async function beginOrderPayment(input: {
   /** Origin the development gateway builds its approval screen on. */
   readonly origin: string;
 }) {
-  const order = await createOrderFromQuote(database(), input);
   const environment = loadEnvironment();
+  // Validate provider configuration before consuming the one-use quote.
   const gateway = createPaymentGateway(environment);
+  const order = await createOrderFromQuote(database(), input);
   const payment = await createPaymentIntent(database(), {
     orderId: order.id,
     method: input.method,

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -60,6 +60,79 @@ export async function ensureActiveCart(executor: Executor, owner: CartOwner) {
     .returning();
   if (!created) throw new Error("Cart insert did not return a row");
   return created;
+}
+
+/** Moves an anonymous cart into the signed-in account, merging duplicate variants. */
+export async function claimAnonymousCart(
+  db: Database,
+  input: { readonly anonymousKey: string; readonly userId: string },
+) {
+  return db.transaction(async (tx) => {
+    const [anonymousCart] = await tx
+      .select()
+      .from(carts)
+      .where(
+        and(
+          eq(carts.anonymousKey, input.anonymousKey),
+          eq(carts.status, "ACTIVE"),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    if (!anonymousCart) return null;
+
+    const [userCart] = await tx
+      .select()
+      .from(carts)
+      .where(and(eq(carts.userId, input.userId), eq(carts.status, "ACTIVE")))
+      .orderBy(desc(carts.updatedAt))
+      .for("update")
+      .limit(1);
+    if (!userCart) {
+      const [claimed] = await tx
+        .update(carts)
+        .set({
+          userId: input.userId,
+          anonymousKey: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(carts.id, anonymousCart.id))
+        .returning();
+      return claimed ?? null;
+    }
+
+    const anonymousItems = await tx
+      .select()
+      .from(cartItems)
+      .where(eq(cartItems.cartId, anonymousCart.id));
+    for (const item of anonymousItems) {
+      await tx
+        .insert(cartItems)
+        .values({
+          cartId: userCart.id,
+          productVariantId: item.productVariantId,
+          sourceOfferId: item.sourceOfferId,
+          quantity: item.quantity,
+        })
+        .onConflictDoUpdate({
+          target: [cartItems.cartId, cartItems.productVariantId],
+          set: {
+            quantity: sql`least(10, ${cartItems.quantity} + ${item.quantity})`,
+            sourceOfferId: item.sourceOfferId,
+            updatedAt: new Date(),
+          },
+        });
+    }
+    await tx
+      .update(carts)
+      .set({ status: "ABANDONED", anonymousKey: null, updatedAt: new Date() })
+      .where(eq(carts.id, anonymousCart.id));
+    await tx
+      .update(carts)
+      .set({ updatedAt: new Date() })
+      .where(eq(carts.id, userCart.id));
+    return userCart;
+  });
 }
 
 export async function addCartItem(
@@ -232,6 +305,12 @@ export async function persistQuote(
   },
 ) {
   return db.transaction(async (tx) => {
+    const [ownedCart] = await tx
+      .select({ id: carts.id })
+      .from(carts)
+      .where(and(eq(carts.id, input.cartId), eq(carts.userId, input.userId)))
+      .limit(1);
+    if (!ownedCart) throw new Error("CART_INVALID");
     await tx
       .update(quotes)
       .set({ status: "CANCELLED" })
@@ -415,7 +494,10 @@ export async function setPaymentAuthority(
       updatedAt: new Date(),
     })
     .where(
-      and(eq(payments.id, input.paymentId), eq(payments.status, "INITIATED")),
+      and(
+        eq(payments.id, input.paymentId),
+        inArray(payments.status, ["INITIATED", "PENDING_VERIFICATION"]),
+      ),
     );
 }
 
@@ -460,6 +542,17 @@ export async function submitPaymentReceipt(
     const owned = await findOwnedPayment(tx, input);
     if (!owned || owned.payment.method !== "CARD_TO_CARD")
       throw new Error("PAYMENT_INVALID");
+    const [updated] = await tx
+      .update(payments)
+      .set({ status: "PENDING_VERIFICATION", updatedAt: new Date() })
+      .where(
+        and(
+          eq(payments.id, input.paymentId),
+          inArray(payments.status, ["INITIATED", "PENDING_VERIFICATION"]),
+        ),
+      )
+      .returning({ id: payments.id });
+    if (!updated) throw new Error("PAYMENT_INVALID");
     const [receipt] = await tx
       .insert(paymentReceipts)
       .values({
@@ -470,10 +563,6 @@ export async function submitPaymentReceipt(
         byteSize: input.byteSize,
       })
       .returning();
-    await tx
-      .update(payments)
-      .set({ status: "PENDING_VERIFICATION", updatedAt: new Date() })
-      .where(eq(payments.id, input.paymentId));
     return receipt;
   });
 }

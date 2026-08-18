@@ -8,6 +8,7 @@ import { currentUser } from "../../../../../server/auth";
 import { database } from "../../../../../server/db";
 
 export const dynamic = "force-dynamic";
+export const metadata = { robots: { index: false, follow: false } };
 
 /**
  * Simulated bank approval screen for the development gateway.
@@ -37,10 +38,9 @@ export default async function GatewaySimulatorPage({
   });
   if (!owned || owned.payment.method !== "GATEWAY") notFound();
 
-  const authority =
-    typeof query.authority === "string"
-      ? query.authority
-      : (owned.payment.providerAuthority ?? "");
+  const authority = owned.payment.providerAuthority ?? "";
+  if (typeof query.authority === "string" && query.authority !== authority)
+    notFound();
   if (authority === "") notFound();
 
   return (

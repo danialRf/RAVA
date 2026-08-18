@@ -12,7 +12,10 @@ import { database } from "../../../../server/db";
 import { beginPaymentAction, createQuoteAction } from "../../actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "قیمت قطعی و پرداخت" };
+export const metadata = {
+  title: "قیمت قطعی و پرداخت",
+  robots: { index: false, follow: false },
+};
 
 export default async function QuotePage({
   params,

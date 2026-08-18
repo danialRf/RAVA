@@ -7,7 +7,10 @@ import { redirect } from "next/navigation";
 import { loadEnvironment } from "@rava/config";
 import { findOwnedPayment, submitPaymentReceipt } from "@rava/db";
 import type { PaymentStatus } from "@rava/domain";
-import { createPrivateStorage } from "@rava/integrations";
+import {
+  createPrivateStorage,
+  matchesImageSignature,
+} from "@rava/integrations";
 
 import { siteUrl } from "../../lib/site";
 import { currentUser, enforceRateLimit } from "../../server/auth";
@@ -152,10 +155,14 @@ export async function uploadReceiptAction(formData: FormData): Promise<void> {
       : file.type === "image/webp"
         ? "webp"
         : "jpg";
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!matchesImageSignature(bytes, file.type)) {
+    redirect(`/checkout/payment/card/${paymentId}?error=file`);
+  }
   const environment = loadEnvironment();
   const stored = await createPrivateStorage(environment).putPrivate(
     `payment-receipts/${user.id}/${randomUUID()}.${extension}`,
-    new Uint8Array(await file.arrayBuffer()),
+    bytes,
     file.type,
   );
   await submitPaymentReceipt(database(), {

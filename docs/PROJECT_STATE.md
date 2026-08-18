@@ -47,12 +47,15 @@ Codex must update this file after every phase.
 ### Cart, quote and deposit payment
 
 - Cart survives anonymously through a signed cookie and binds to the account at sign-in. Only verified, in-stock offers can enter it; quantity is capped per line.
+- Anonymous cart claiming merges duplicate variants into an existing account cart without exceeding the quantity cap.
 - A quote is an immutable snapshot: FX snapshot id and rate, per-line cost breakdown, applied rule ids, calculation version and a 10-minute expiry. Issuing a new quote for a cart cancels the previous active one.
 - Orders are created only inside one transaction that re-locks the quote, re-checks ownership of the address and revalidates every source offer against the price, shipping and stock the quote was built on. Any drift raises `SOURCE_CHANGED` and no order is written.
 - The quote page shows a live countdown and, after expiry, refreshes and shows the difference before any payment.
 - `FakePaymentGateway` implements the `PaymentGateway` interface. It redirects to a local approval screen that stands in for the bank, so the return trip is a real top-level browser navigation through the callback exactly as production behaves.
 - Gateway callbacks are idempotent: a replayed callback returns without re-capturing, an amount mismatch is rejected, and only a `DEPOSIT_PENDING` order is payable. Success moves the order to `PROCUREMENT_PENDING`, records the paid deposit, appends status history and writes an outbox event in the same transaction.
 - Card-to-card deposits accept a private JPG/PNG/WebP receipt up to 5 MiB and move the payment to `PENDING_VERIFICATION`. A receipt is evidence only and never credits money to the order.
+- Receipt uploads validate file signatures as well as MIME and size; repository status guards reject late or concurrent uploads to completed payments.
+- Checkout pages are `noindex`, and the development gateway accepts only the authority persisted for the owned payment.
 - The worker refreshes the FX snapshot on an interval and logs each success or failure.
 
 ## Current architecture decisions
@@ -100,12 +103,12 @@ Codex must update this file after every phase.
 
 ## Latest verification (2026-08-18)
 
-Passed after Phase 5:
+Passed after Phase 5 hardening:
 
 - `pnpm format` and `pnpm format:check`.
 - `pnpm lint`.
 - `pnpm typecheck` across all workspace packages.
-- `pnpm test` — 10 files, 129 tests, including live PostgreSQL migrations, repositories and the idempotent checkout/payment callback.
+- `pnpm test` — 11 files, 149 tests, including live PostgreSQL migrations, repositories, payment callbacks and upload-signature validation.
 - `pnpm db:generate` — no schema drift.
 - `pnpm db:migrate` against local PostgreSQL.
 - `pnpm worker:smoke`.
@@ -113,7 +116,7 @@ Passed after Phase 5:
 - `pnpm test:e2e` — 20 tests covering the storefront, account journeys, the full cart to locked quote to gateway deposit path, the card-to-card receipt path and responsive captures.
 - Visual review recorded in `docs/PHASE_5_UI_REVIEW.md`; captures are in `docs/phase-5-quote-390x844.png`, `docs/phase-5-order-390x844.png` and `docs/phase-5-card-receipt-390x844.png`.
 
-The distributed workspace has no Git metadata, so Git diff checks are not applicable.
+The repository is versioned on GitHub at `danialRf/RAVA`; CI generates Next.js route types before TypeScript checking so a clean runner matches local verification.
 
 ## Next phase
 

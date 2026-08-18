@@ -3,6 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 
 import {
+  claimAnonymousCart,
   listWishlistProducts,
   replaceWishlistFromSlugs,
   toggleUserWishlist,
@@ -27,6 +28,7 @@ const RECENT_COOKIE = "rava_recent";
 const MAX_WISHLIST = 50;
 const MAX_RECENT = 12;
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+const CART_COOKIE = "rava_cart";
 
 /** Slugs are stored comma separated; anything unexpected is dropped. */
 function parseSlugs(value: string | undefined, max: number): string[] {
@@ -91,6 +93,16 @@ export async function migrateAnonymousWishlist(userId: string): Promise<void> {
   const slugs = parseSlugs(store.get(WISHLIST_COOKIE)?.value, MAX_WISHLIST);
   await replaceWishlistFromSlugs(database(), userId, slugs);
   store.delete(WISHLIST_COOKIE);
+}
+
+/** Preserves a guest's shopping intent when authentication completes. */
+export async function migrateAnonymousCart(userId: string): Promise<void> {
+  const store = await cookies();
+  const anonymousKey = store.get(CART_COOKIE)?.value;
+  if (anonymousKey && /^[a-f0-9-]{36}$/i.test(anonymousKey)) {
+    await claimAnonymousCart(database(), { anonymousKey, userId });
+  }
+  store.delete(CART_COOKIE);
 }
 
 // Recording a view happens in `src/proxy.ts`: server components are allowed to

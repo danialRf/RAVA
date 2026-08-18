@@ -43,7 +43,10 @@ import {
   randomToken,
 } from "../../server/auth";
 import { database } from "../../server/db";
-import { migrateAnonymousWishlist } from "../../server/session";
+import {
+  migrateAnonymousCart,
+  migrateAnonymousWishlist,
+} from "../../server/session";
 
 function text(formData: FormData, name: string): string {
   return String(formData.get(name) ?? "").trim();
@@ -62,7 +65,10 @@ async function finishSignIn(
   redirectTo = "/account",
 ): Promise<never> {
   await createAuthSession(userId);
-  await migrateAnonymousWishlist(userId);
+  await Promise.all([
+    migrateAnonymousWishlist(userId),
+    migrateAnonymousCart(userId),
+  ]);
   redirect(safeRedirectPath(redirectTo));
 }
 
