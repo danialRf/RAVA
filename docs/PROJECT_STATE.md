@@ -117,6 +117,7 @@ Passed after Phase 5 hardening:
 - Visual review recorded in `docs/PHASE_5_UI_REVIEW.md`; captures are in `docs/phase-5-quote-390x844.png`, `docs/phase-5-order-390x844.png` and `docs/phase-5-card-receipt-390x844.png`.
 
 The repository is versioned on GitHub at `danialRf/RAVA`; CI generates Next.js route types before TypeScript checking so a clean runner matches local verification.
+CI uses the deterministic private-storage adapter because its service matrix does not run MinIO; local development continues to exercise MinIO through Docker Compose.
 
 ## Next phase
 
