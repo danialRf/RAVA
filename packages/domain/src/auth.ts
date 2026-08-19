@@ -6,6 +6,8 @@
  */
 
 /** Verifies an Iranian mobile number in the local 09… or +989… shapes. */
+import type { UserRole } from "./enums";
+
 const IRANIAN_MOBILE = /^(\+98|0)?9\d{9}$/;
 
 export function isEmail(candidate: string): boolean {
@@ -82,7 +84,7 @@ export const OAUTH_STATE_TTL_SECONDS = 60 * 10;
 
 export type SessionPrincipal = {
   readonly id: string;
-  readonly role: string;
+  readonly role: UserRole;
   readonly displayName: string | null;
   readonly email: string | null;
   readonly emailVerifiedAt: Date | null;

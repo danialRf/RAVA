@@ -73,6 +73,8 @@ Codex must update this file after every phase.
 ## Current architecture decisions
 
 - Next.js App Router web app plus a separate worker inside the TypeScript monorepo; no premature microservices.
+- Phase 6 has started with centralized least-privilege RBAC and a server-protected admin route. The first operational read models cover overview totals, orders, payment review, procurement and the append-only audit log; every value comes from persisted rows.
+- Staff roles are `OWNER`, `ADMIN`, `MERCHANDISER`, `BUYER_GERMANY`, `SUPPORT`, `FINANCE` and `CONTENT_EDITOR`. The legacy `OPERATOR` value remains read-only for migration compatibility and should be reassigned explicitly.
 - The persistent storefront header owns a semantic inline search form; `/search` receives the query and renders results rather than acting as an intermediate query-entry step.
 - Request-scoped composition stays in `apps/web/src/server`; pure policy stays in `@rava/domain`; persistence stays in `@rava/db`.
 - Catalog pages are dynamic because price, stock and trip windows are live data.
@@ -114,19 +116,19 @@ Codex must update this file after every phase.
 - Real Google, SMS, SMTP and production storage integrations cannot be end-to-end verified until credentials are supplied.
 - `pnpm test` requires the local PostgreSQL infrastructure; `pnpm test:unit` does not.
 
-## Latest verification (2026-08-19)
+## Latest verification (2026-08-20)
 
 Passed after Phase 5 hardening:
 
 - `pnpm format` and `pnpm format:check`.
 - `pnpm lint`.
 - `pnpm typecheck` across all workspace packages.
-- `pnpm test` — 11 files, 149 tests, including live PostgreSQL migrations, repositories, payment callbacks and upload-signature validation.
+- `pnpm test` — 14 files, 158 tests, including live PostgreSQL migrations, admin read models/RBAC, repositories, payment callbacks and upload-signature validation.
 - `pnpm db:generate` — no schema drift.
 - `pnpm db:migrate` against local PostgreSQL.
 - `pnpm worker:smoke`.
 - Production Next.js build — all application routes compiled, including the checkout, gateway and receipt routes.
-- `pnpm test:e2e` — 20 tests covering the storefront, account journeys, the full cart to locked quote to gateway deposit path, the card-to-card receipt path and responsive captures.
+- `pnpm test:e2e` — 22 tests covering the storefront, account journeys, admin denial for guests/customers, the full cart to locked quote to gateway deposit path, the card-to-card receipt path and responsive captures.
 - Responsive authentication checks cover the simplified entry surface and cart discoverability at mobile and desktop widths.
 - Visual review recorded in `docs/PHASE_5_UI_REVIEW.md`; captures are in `docs/phase-5-quote-390x844.png`, `docs/phase-5-order-390x844.png` and `docs/phase-5-card-receipt-390x844.png`.
 
@@ -135,4 +137,4 @@ CI uses the deterministic private-storage adapter because its service matrix doe
 
 ## Next phase
 
-Phase 6 — admin operating system (`prompts/06_ADMIN_OS.md`), including the pricing-settings screen that lets an admin edit every pricing factor except the live FX rate.
+Continue Phase 6 — add audited payment review and procurement actions, then catalog/pricing editors, trips, customers, sources, content and health screens. Pricing settings must expose every pricing factor except the provider-owned live FX rate.

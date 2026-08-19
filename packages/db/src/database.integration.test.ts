@@ -39,6 +39,11 @@ import {
   getPublishedProductBySlug,
   getStorefrontProduct,
   listBrandsWithCounts,
+  getAdminOverview,
+  listAdminAuditLog,
+  listAdminOrders,
+  listPaymentsNeedingReview,
+  listProcurementQueue,
   listCategoriesWithCounts,
   listOfferPriceHistory,
   listOrderStatusHistory,
@@ -257,6 +262,29 @@ describe("migrations", () => {
       sql`select count(*)::text as count from drizzle.__drizzle_migrations`,
     );
     expect(Number(result[0]?.count ?? 0)).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("admin operating read models", () => {
+  it("reads only persisted operational queues and totals", async () => {
+    await seed(db);
+
+    const [overview, adminOrders, paymentQueue, procurementQueue, auditLog] =
+      await Promise.all([
+        getAdminOverview(db),
+        listAdminOrders(db),
+        listPaymentsNeedingReview(db),
+        listProcurementQueue(db),
+        listAdminAuditLog(db),
+      ]);
+
+    expect(adminOrders).toHaveLength(1);
+    expect(adminOrders[0]?.orderNumber).toBe("RAVA-DEMO-0001");
+    expect(overview.depositsReceived).toBeGreaterThan(0n);
+    expect(overview.outstandingBalances).toBeGreaterThan(0n);
+    expect(paymentQueue).toEqual([]);
+    expect(procurementQueue).toEqual([]);
+    expect(auditLog).toEqual([]);
   });
 });
 

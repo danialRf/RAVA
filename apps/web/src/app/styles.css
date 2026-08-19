@@ -1589,6 +1589,217 @@ p {
   }
 }
 
+/* Admin OS: operational density without inheriting a generic dashboard look. */
+.admin-shell {
+  width: min(100% - 1.5rem, 88rem);
+  margin: 1rem auto 5rem;
+  display: grid;
+  gap: 1rem;
+}
+.admin-sidebar,
+.admin-content {
+  border: 1px solid var(--rava-border);
+  background: white;
+}
+.admin-sidebar {
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+.admin-sidebar > div:first-child {
+  display: grid;
+}
+.admin-sidebar p,
+.admin-page-header p {
+  margin: 0;
+  color: var(--rava-burgundy);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+.admin-sidebar small {
+  color: var(--rava-muted-ink);
+}
+.admin-sidebar nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+.admin-sidebar nav a {
+  min-height: 42px;
+  padding: 0.5rem 0.65rem;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--rava-border);
+  font-size: 0.76rem;
+}
+.admin-sidebar nav a:hover,
+.admin-sidebar nav a:focus-visible {
+  border-color: var(--rava-gold);
+  background: var(--rava-gold-pale);
+}
+.admin-next-modules {
+  display: grid;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--rava-border);
+  color: var(--rava-muted-ink);
+  font-size: 0.7rem;
+}
+.admin-content {
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+.admin-page-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--rava-border);
+}
+.admin-page-header h1 {
+  margin: 0.2rem 0;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+}
+.admin-page-header span {
+  color: var(--rava-muted-ink);
+  font-size: 0.8rem;
+}
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.admin-metrics > * {
+  min-height: 108px;
+  padding: 0.9rem;
+  display: grid;
+  align-content: space-between;
+  border: 1px solid var(--rava-border);
+  background: var(--rava-paper);
+}
+.admin-metrics span {
+  color: var(--rava-muted-ink);
+  font-size: 0.72rem;
+}
+.admin-metrics strong {
+  color: var(--rava-burgundy-dark);
+  font-size: 1.7rem;
+}
+.admin-money-summary {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--rava-gold) 60%, var(--rava-border));
+  background: var(--rava-gold-pale);
+}
+.admin-money-summary h2 {
+  font-size: 1rem;
+}
+.admin-money-summary dl,
+.procurement-grid dl {
+  margin: 0;
+}
+.admin-money-summary dl > div,
+.procurement-grid dl > div {
+  padding-block: 0.4rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--rava-gold) 50%, transparent);
+}
+.admin-money-summary dt,
+.procurement-grid dt {
+  color: var(--rava-muted-ink);
+}
+.admin-money-summary dd,
+.procurement-grid dd {
+  margin: 0;
+  font-weight: 700;
+}
+.admin-list {
+  display: grid;
+}
+.admin-list article {
+  padding: 0.9rem 0;
+  display: grid;
+  gap: 0.65rem;
+  border-bottom: 1px solid var(--rava-border);
+}
+.admin-list article > div {
+  display: grid;
+}
+.admin-list span,
+.admin-list small {
+  color: var(--rava-muted-ink);
+  font-size: 0.7rem;
+}
+.admin-status {
+  width: fit-content;
+  padding: 0.1rem 0.45rem;
+  color: var(--rava-burgundy-dark) !important;
+  background: var(--rava-rose-soft);
+  font: 700 0.65rem/1.8 var(--rava-font-latin);
+}
+.admin-empty {
+  padding: 2rem 1rem;
+  border-block: 1px solid var(--rava-border);
+  color: var(--rava-muted-ink);
+  text-align: center;
+}
+.procurement-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+.procurement-grid article {
+  padding: 1rem;
+  border: 1px solid var(--rava-border);
+  background: var(--rava-paper);
+}
+.procurement-grid h2 {
+  margin: 0.6rem 0 0;
+  font-size: 1rem;
+}
+.procurement-grid p {
+  color: var(--rava-muted-ink);
+  font-size: 0.7rem;
+}
+.procurement-grid dl {
+  font-size: 0.74rem;
+}
+.procurement-grid > article > a {
+  min-height: 44px;
+  margin-top: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rava-gold);
+  color: var(--rava-gold-deep);
+  background: var(--rava-gold-pale);
+}
+@media (min-width: 64rem) {
+  .admin-shell {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .admin-sidebar {
+    position: sticky;
+    top: 8rem;
+  }
+  .admin-sidebar nav {
+    grid-template-columns: 1fr;
+  }
+  .admin-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .admin-list article {
+    grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) minmax(
+        10rem,
+        1fr
+      );
+    align-items: center;
+  }
+  .procurement-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Champagne editorial refinement — inspired by the supplied beauty cards. */
 body {
   font-family: var(--rava-font-sans);

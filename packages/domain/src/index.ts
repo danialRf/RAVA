@@ -5,6 +5,7 @@ export interface ServiceHealth {
 }
 
 export * from "./auth";
+export * from "./admin";
 export * from "./enums";
 export * from "./money";
 export * from "./pricing";

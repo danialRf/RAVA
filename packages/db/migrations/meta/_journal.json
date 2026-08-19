@@ -29,6 +29,13 @@
       "when": 1787175000000,
       "tag": "0003_storefront_search_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787260800000,
+      "tag": "0004_cheerful_darwin",
+      "breakpoints": true
     }
   ]
 }

@@ -8,7 +8,18 @@
  * Raw enum names are internal. Customer-facing wording lives in the UI layer.
  */
 
-export const USER_ROLES = ["CUSTOMER", "SUPPORT", "OPERATOR", "ADMIN"] as const;
+export const USER_ROLES = [
+  "CUSTOMER",
+  "OWNER",
+  "ADMIN",
+  "MERCHANDISER",
+  "BUYER_GERMANY",
+  "SUPPORT",
+  "FINANCE",
+  "CONTENT_EDITOR",
+  /** Kept for existing installations; new staff accounts use a specific role. */
+  "OPERATOR",
+] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const USER_STATUSES = ["ACTIVE", "SUSPENDED", "DELETED"] as const;
