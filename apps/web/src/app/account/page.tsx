@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { loadEnvironment } from "@rava/config";
+import { redirect } from "next/navigation";
 import {
   listAddresses,
   listAlerts,
@@ -22,58 +22,13 @@ export default async function AccountPage({
   searchParams,
 }: PageProps<"/account">) {
   const user = await currentUser();
+  if (!user) {
+    redirect("/account/login");
+  }
+
   const query = await searchParams;
   const error = typeof query.error === "string" ? query.error : undefined;
   const notice = typeof query.notice === "string" ? query.notice : undefined;
-  if (!user) {
-    const environment = loadEnvironment();
-    const googleEnabled = Boolean(
-      environment.AUTH_GOOGLE_ID && environment.AUTH_GOOGLE_SECRET,
-    );
-    return (
-      <div className="section-shell account-page">
-        <PageIntro
-          eyebrow="فضای شخصی شما"
-          title="حساب من"
-          copy="سفارش‌ها، علاقه‌مندی‌ها و درخواست‌هایتان را در یک جای امن نگه دارید."
-        />
-        <FormMessage error={error} notice={notice} />
-        <div className="account-entry">
-          <section>
-            <h2>قبلاً حساب ساخته‌اید؟</h2>
-            <p>با ایمیل و گذرواژه یا شماره موبایل وارد شوید.</p>
-            <Link className="button primary" href="/account/login">
-              ورود با ایمیل
-            </Link>
-            <Link className="button secondary" href="/account/otp">
-              ورود با کد موبایل
-            </Link>
-          </section>
-          <section>
-            <h2>اولین بار است؟</h2>
-            <p>ساخت حساب کمتر از یک دقیقه زمان می‌برد.</p>
-            <Link className="button secondary" href="/account/register">
-              ساخت حساب
-            </Link>
-            <span className="provider-divider">یا</span>
-            {googleEnabled ? (
-              <Link className="button secondary" href="/api/auth/google">
-                ورود با Google
-              </Link>
-            ) : (
-              <button
-                className="button secondary"
-                disabled
-                title="شناسه Google تنظیم نشده است"
-              >
-                Google · فعلاً غیرفعال
-              </button>
-            )}
-          </section>
-        </div>
-      </div>
-    );
-  }
   const [addresses, alerts, requests, wishlist] = await Promise.all([
     listAddresses(database(), user.id),
     listAlerts(database(), user.id),

@@ -2523,26 +2523,6 @@ body {
   border-color: var(--rava-success);
   color: var(--rava-success);
 }
-.account-entry {
-  padding-block: 1.5rem 3rem;
-  display: grid;
-  gap: 1rem;
-}
-.account-entry section {
-  padding: 1.25rem;
-  border: 1px solid var(--rava-border);
-  border-radius: var(--rava-radius-card);
-}
-.account-entry h2 {
-  font-size: 1.15rem;
-}
-.account-entry p {
-  color: var(--rava-muted-ink);
-  font-size: 0.8rem;
-}
-.account-entry .button {
-  margin: 0.25rem 0 0.25rem 0.35rem;
-}
 .provider-divider {
   display: block;
   margin: 0.5rem 0;
@@ -2789,7 +2769,6 @@ button.danger {
     min-height: 590px;
     padding: 3rem;
   }
-  .account-entry,
   .address-layout,
   .account-two-column {
     grid-template-columns: 1fr 1fr;

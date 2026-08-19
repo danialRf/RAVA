@@ -45,6 +45,7 @@ Codex must update this file after every phase.
 - The visual system now uses champagne gold as a visible secondary surface, supported by rose, peach and lilac tones translated from the supplied references; the system is documented in `docs/DESIGN_REFINEMENT.md`.
 - Store navigation now exposes the cart as a primary destination in both the desktop header and mobile bottom navigation.
 - Authentication uses one consistent two-state entry surface (`ورود` / `ثبت‌نام`): email/password remains the primary login path, password recovery stays contextual, and secondary OTP entry no longer competes on the main login screen.
+- Anonymous visits to `/account` redirect directly to `/account/login`; `/account` is reserved for the signed-in dashboard.
 
 ### Cart, quote and deposit payment
 

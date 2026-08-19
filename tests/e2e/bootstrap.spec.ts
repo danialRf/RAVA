@@ -315,6 +315,9 @@ test("locks a quote, pays the deposit and creates a trackable order", async ({
 });
 
 test("captures the account entry at mobile and desktop", async ({ page }) => {
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/account\/login$/);
+
   for (const viewport of [
     { name: "390x844", width: 390, height: 844 },
     { name: "desktop-1440", width: 1440, height: 1000 },
