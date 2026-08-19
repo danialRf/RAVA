@@ -83,6 +83,82 @@ export interface PricingRuleQuery {
   readonly now?: Date;
 }
 
+export type PricingRule = typeof pricingRules.$inferSelect;
+
+const RULE_SCOPE_ORDER: Readonly<Record<PricingRule["scope"], number>> = {
+  PRODUCT: 1,
+  BRAND: 2,
+  CATEGORY: 3,
+  PRICE_BAND: 4,
+  TRUST_TIER: 5,
+  GLOBAL: 6,
+};
+
+/** Loads the small active rule set once so a product list does not query per row. */
+export async function listActivePricingRules(
+  executor: Executor,
+  now = new Date(),
+): Promise<readonly PricingRule[]> {
+  return executor
+    .select()
+    .from(pricingRules)
+    .where(
+      and(
+        lte(pricingRules.activeFrom, now),
+        or(isNull(pricingRules.activeTo), gt(pricingRules.activeTo, now)),
+      ),
+    )
+    .orderBy(
+      sql`case ${pricingRules.scope}
+        when 'PRODUCT' then 1
+        when 'BRAND' then 2
+        when 'CATEGORY' then 3
+        when 'PRICE_BAND' then 4
+        when 'TRUST_TIER' then 5
+        else 6 end`,
+      desc(pricingRules.priority),
+      desc(pricingRules.activeFrom),
+    );
+}
+
+/** Pure equivalent of the SQL resolver for an already-loaded active rule set. */
+export function selectPricingRule(
+  rules: readonly PricingRule[],
+  query: PricingRuleQuery,
+): PricingRule | null {
+  const matches = rules.filter((rule) => {
+    switch (rule.scope) {
+      case "PRODUCT":
+        return query.productId != null && rule.productId === query.productId;
+      case "BRAND":
+        return query.brandId != null && rule.brandId === query.brandId;
+      case "CATEGORY":
+        return query.categoryId != null && rule.categoryId === query.categoryId;
+      case "PRICE_BAND":
+        return (
+          query.sourcePriceEurCents != null &&
+          (rule.priceBandMinEurCents == null ||
+            rule.priceBandMinEurCents <= query.sourcePriceEurCents) &&
+          (rule.priceBandMaxEurCents == null ||
+            rule.priceBandMaxEurCents > query.sourcePriceEurCents)
+        );
+      case "TRUST_TIER":
+        return query.trustTier != null && rule.trustTier === query.trustTier;
+      case "GLOBAL":
+        return true;
+    }
+  });
+
+  return (
+    matches.sort(
+      (left, right) =>
+        RULE_SCOPE_ORDER[left.scope] - RULE_SCOPE_ORDER[right.scope] ||
+        right.priority - left.priority ||
+        right.activeFrom.getTime() - left.activeFrom.getTime(),
+    )[0] ?? null
+  );
+}
+
 /**
  * Resolves the single rule that applies, most specific first.
  *

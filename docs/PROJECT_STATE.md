@@ -2,6 +2,11 @@
 
 Codex must update this file after every phase.
 
+## Architecture and performance hardening (in progress)
+
+- Storefront pricing now loads the active pricing-rule set once per server render and resolves product/category/brand/price-band precedence in a pure selector. Product grids no longer issue one pricing-rule query per product.
+- The selector has focused tests for specificity, priority/time tie-breaking and half-open price bands. Application-service boundaries, storefront caching/search indexes and CI runtime remain the next hardening milestones.
+
 ## Current phase
 
 `PHASE_5_CHECKOUT_PAYMENTS_COMPLETE`

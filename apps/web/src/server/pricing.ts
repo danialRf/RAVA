@@ -10,7 +10,12 @@ import {
   type EstimateRule,
   type TransportClass,
 } from "@rava/domain";
-import { findFreshFxRate, recordFxRate, resolvePricingRule } from "@rava/db";
+import {
+  findFreshFxRate,
+  listActivePricingRules,
+  recordFxRate,
+  selectPricingRule,
+} from "@rava/db";
 import {
   createFxRateProvider,
   FxRateUnavailableError,
@@ -119,15 +124,8 @@ export const getStorefrontRate = cache(
   },
 );
 
-/** Pricing rules change rarely; one lookup per request is enough. */
-const getRuleFor = cache(
-  async (input: {
-    readonly productId: string;
-    readonly brandId: string;
-    readonly categoryId: string;
-    readonly sourcePriceEurCents: bigint;
-  }) => resolvePricingRule(database(), input),
-);
+/** One pricing-rule query per render, independent of product count. */
+const getActiveRules = cache(async () => listActivePricingRules(database()));
 
 export interface EstimateSubject {
   readonly productId: string;
@@ -174,7 +172,7 @@ export async function estimateFor(
 ): Promise<PriceEstimate | null> {
   if (rate === null || subject.sourcePriceEurCents === null) return null;
 
-  const rule = await getRuleFor({
+  const rule = selectPricingRule(await getActiveRules(), {
     productId: subject.productId,
     brandId: subject.brandId,
     categoryId: subject.categoryId,
