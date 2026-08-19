@@ -42,7 +42,15 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
@@ -52,5 +60,5 @@ jobs:
       - run: pnpm test
       - run: pnpm worker:smoke
       - run: pnpm db:seed
-      - run: pnpm build
+      # `test:e2e` owns the single production build through `pretest:e2e`.
       - run: pnpm test:e2e
