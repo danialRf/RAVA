@@ -73,6 +73,7 @@ Codex must update this file after every phase.
 ## Current architecture decisions
 
 - Next.js App Router web app plus a separate worker inside the TypeScript monorepo; no premature microservices.
+- The persistent storefront header owns a semantic inline search form; `/search` receives the query and renders results rather than acting as an intermediate query-entry step.
 - Request-scoped composition stays in `apps/web/src/server`; pure policy stays in `@rava/domain`; persistence stays in `@rava/db`.
 - Catalog pages are dynamic because price, stock and trip windows are live data.
 - Cookie `Secure` flags derive from `APP_URL`, not `NODE_ENV`.

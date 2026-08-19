@@ -31,10 +31,22 @@ export function Header({ announcement }: { announcement: string }) {
             <strong>{RAVA_BRAND.nameFa}</strong>
             <bdi dir="ltr">RAVA</bdi>
           </Link>
-          <Link className="header-search" href="/search">
-            <Icon name="search" width="20" />
-            <span>جست‌وجوی محصول، برند یا مدل</span>
-          </Link>
+          <form className="header-search" action="/search" role="search">
+            <label className="sr-only" htmlFor="header-search-query">
+              جست‌وجوی محصول، برند یا مدل
+            </label>
+            <input
+              id="header-search-query"
+              name="q"
+              type="search"
+              placeholder="جست‌وجوی محصول، برند یا مدل"
+              autoComplete="off"
+              enterKeyHint="search"
+            />
+            <button type="submit" aria-label="اجرای جست‌وجو">
+              <Icon name="search" width="20" />
+            </button>
+          </form>
           <nav className="desktop-actions" aria-label="ابزارهای فروشگاه">
             <Link className="header-cart-link" href="/cart">
               <Icon name="bag" width="22" />

@@ -118,6 +118,15 @@ test("searches Persian and Latin terms and shows an honest empty state", async (
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
+  // Search starts directly inside the persistent header instead of sending
+  // the visitor to a second page just to enter a query.
+  await page.goto("/");
+  const headerSearch = page.locator(".header-search");
+  await headerSearch.getByRole("searchbox").fill("Samba");
+  await headerSearch.getByRole("searchbox").press("Enter");
+  await expect(page).toHaveURL(/\/search\?q=Samba$/);
+  await expect(page.locator(".product-card").first()).toBeVisible();
+
   await page.goto("/search?q=Samba");
   await expect(page.locator(".product-card").first()).toBeVisible();
 
