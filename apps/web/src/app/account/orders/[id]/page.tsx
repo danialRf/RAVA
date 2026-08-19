@@ -30,6 +30,20 @@ export default async function OrderPage({
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const result = await readOwnedOrder(id, user.id);
   if (!result) notFound();
+  const resumablePayment = result.payments.find(
+    (payment) =>
+      payment.type === "DEPOSIT" &&
+      ["INITIATED", "PENDING_VERIFICATION"].includes(payment.status),
+  );
+  const paymentHref =
+    result.order.status !== "DEPOSIT_PENDING" || !resumablePayment
+      ? null
+      : resumablePayment.method === "GATEWAY" &&
+          resumablePayment.providerAuthority
+        ? `/checkout/payment/gateway/${resumablePayment.id}?authority=${encodeURIComponent(resumablePayment.providerAuthority)}`
+        : resumablePayment.method === "CARD_TO_CARD"
+          ? `/checkout/payment/card/${resumablePayment.id}`
+          : null;
   return (
     <div className="section-shell account-page order-page">
       <PageIntro
@@ -83,6 +97,13 @@ export default async function OrderPage({
               <dd>{formatToman(result.order.depositPaidToman)} تومان</dd>
             </div>
           </dl>
+          {paymentHref && (
+            <Link className="button primary wide" href={paymentHref}>
+              {resumablePayment?.method === "GATEWAY"
+                ? "ادامه پرداخت آنلاین"
+                : "ارسال یا ویرایش رسید"}
+            </Link>
+          )}
           <Link href="/account">بازگشت به حساب</Link>
         </aside>
       </div>

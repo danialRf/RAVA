@@ -2400,6 +2400,9 @@ body {
   display: grid;
   gap: 1rem;
 }
+.order-overview > aside > .button {
+  margin-block: 0.5rem 1rem;
+}
 
 .order-list {
   display: grid;

@@ -12,7 +12,7 @@ import {
   matchesImageSignature,
 } from "@rava/integrations";
 
-import { siteUrl } from "../../lib/site";
+import { checkoutOrigin } from "../../lib/site";
 import { currentUser, enforceRateLimit } from "../../server/auth";
 import {
   addCurrentCartItem,
@@ -89,16 +89,10 @@ export async function beginPaymentAction(formData: FormData): Promise<void> {
   let result;
   try {
     const requestHeaders = await headers();
-    const requestHost = requestHeaders.get("host");
-    const developmentOrigin =
-      process.env.NODE_ENV !== "production" &&
-      requestHost &&
-      /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(requestHost)
-        ? `http://${requestHost}`
-        : siteUrl();
+    const paymentOrigin = checkoutOrigin(requestHeaders.get("host"));
     const callbackUrl = new URL(
       "/api/payments/fake/callback",
-      developmentOrigin,
+      paymentOrigin,
     ).toString();
     result = await beginOrderPayment({
       quoteId,
@@ -106,7 +100,7 @@ export async function beginPaymentAction(formData: FormData): Promise<void> {
       addressId,
       method,
       callbackUrl,
-      origin: developmentOrigin,
+      origin: paymentOrigin,
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "PAYMENT_FAILED";

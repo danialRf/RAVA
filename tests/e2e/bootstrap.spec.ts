@@ -296,6 +296,19 @@ test("locks a quote, pays the deposit and creates a trackable order", async ({
     page.getByRole("heading", { name: "تأیید پیش‌پرداخت" }),
   ).toBeVisible();
 
+  // If the customer closes the bank page, the pending order remains payable
+  // and resumes the exact persisted payment intent instead of creating a
+  // duplicate order or charging attempt.
+  const gatewayUrl = page.url();
+  const paymentId = new URL(gatewayUrl).pathname.split("/").at(-1);
+  await page.goto("/account/orders");
+  const pendingOrderLink = page.locator(".order-list > a").first();
+  await pendingOrderLink.click();
+  await page.getByRole("link", { name: "ادامه پرداخت آنلاین" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/checkout/payment/gateway/${paymentId}\\?authority=`),
+  );
+
   await page.getByRole("button", { name: "پرداخت آزمایشی امن" }).click();
   await expect(page).toHaveURL(/\/account\/orders\/[0-9a-f-]+\?notice=paid/, {
     timeout: 20_000,

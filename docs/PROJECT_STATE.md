@@ -56,6 +56,7 @@ Codex must update this file after every phase.
 - The quote page shows a live countdown and, after expiry, refreshes and shows the difference before any payment.
 - `FakePaymentGateway` implements the `PaymentGateway` interface. It redirects to a local approval screen that stands in for the bank, so the return trip is a real top-level browser navigation through the callback exactly as production behaves.
 - Gateway callbacks are idempotent: a replayed callback returns without re-capturing, an amount mismatch is rejected, and only a `DEPOSIT_PENDING` order is payable. Success moves the order to `PROCUREMENT_PENDING`, records the paid deposit, appends status history and writes an outbox event in the same transaction.
+- Checkout redirects use the active loopback host during local production-build QA, while deployed traffic remains pinned to the configured `APP_URL`. Pending orders expose a continuation action backed by the original persisted payment intent, so leaving the gateway never strands an order or creates a duplicate charge attempt.
 - Card-to-card deposits accept a private JPG/PNG/WebP receipt up to 5 MiB and move the payment to `PENDING_VERIFICATION`. A receipt is evidence only and never credits money to the order.
 - Receipt uploads validate file signatures as well as MIME and size; repository status guards reject late or concurrent uploads to completed payments.
 - Checkout pages are `noindex`, and the development gateway accepts only the authority persisted for the owned payment.
