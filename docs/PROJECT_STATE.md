@@ -7,6 +7,8 @@ Codex must update this file after every phase.
 - Storefront pricing now loads the active pricing-rule set once per server render and resolves product/category/brand/price-band precedence in a pure selector. Product grids no longer issue one pricing-rule query per product.
 - The selector has focused tests for specificity, priority/time tie-breaking and half-open price bands. Application-service boundaries, storefront caching/search indexes and CI runtime remain the next hardening milestones.
 - CI caches the Playwright browser separately from OS dependencies and performs one production build instead of rebuilding immediately before E2E.
+- Account pages read through a dedicated server-side application service instead of receiving database handles. Stable public taxonomy uses a bounded five-minute server cache; product money/stock rows, personalized data, checkout and payment remain uncached because integer money must not pass through a JSON-only cache boundary.
+- PostgreSQL trigram indexes cover Persian/original titles, descriptions and brand names so the launch `ILIKE` search path remains usable as the catalog grows.
 
 ## Current phase
 

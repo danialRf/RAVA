@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
-import { listNotificationPreferences } from "@rava/db";
 import { AccountNav, FormMessage } from "../../../components/account";
 import { PageIntro } from "../../../components/storefront";
 import { currentUser } from "../../../server/auth";
-import { database } from "../../../server/db";
+import { accountQueries } from "../../../server/account";
 import { updatePreferencesAction } from "../manage-actions";
 
 export default async function NotificationsPage({
@@ -12,7 +11,7 @@ export default async function NotificationsPage({
   const user = await currentUser();
   if (!user) redirect("/account/login");
   const [items, q] = await Promise.all([
-    listNotificationPreferences(database(), user.id),
+    accountQueries.notificationPreferences(user.id),
     searchParams,
   ]);
   const enabled = (channel: string) =>

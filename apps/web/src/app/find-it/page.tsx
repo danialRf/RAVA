@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { listProductRequests } from "@rava/db";
 import { FormMessage } from "../../components/account";
 import { PageIntro } from "../../components/storefront";
 import { currentUser } from "../../server/auth";
-import { database } from "../../server/db";
+import { accountQueries } from "../../server/account";
 import { createProductRequestAction } from "../account/manage-actions";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +22,7 @@ export default async function FindItPage({
   searchParams,
 }: PageProps<"/find-it">) {
   const [user, q] = await Promise.all([currentUser(), searchParams]);
-  const requests = user ? await listProductRequests(database(), user.id) : [];
+  const requests = user ? await accountQueries.productRequests(user.id) : [];
   return (
     <div className="section-shell request-page">
       <PageIntro

@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
-import { listAddresses } from "@rava/db";
 import { AccountNav, FormMessage } from "../../../components/account";
 import { PageIntro } from "../../../components/storefront";
 import { currentUser } from "../../../server/auth";
-import { database } from "../../../server/db";
+import { accountQueries } from "../../../server/account";
 import {
   createAddressAction,
   deleteAddressAction,
@@ -16,7 +15,7 @@ export default async function AddressesPage({
   const user = await currentUser();
   if (!user) redirect("/account/login");
   const [items, q] = await Promise.all([
-    listAddresses(database(), user.id),
+    accountQueries.addresses(user.id),
     searchParams,
   ]);
   return (

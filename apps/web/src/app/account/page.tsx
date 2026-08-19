@@ -1,15 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  listAddresses,
-  listAlerts,
-  listProductRequests,
-  listWishlistProducts,
-} from "@rava/db";
 import { AccountNav, FormMessage } from "../../components/account";
 import { PageIntro } from "../../components/storefront";
 import { currentUser } from "../../server/auth";
-import { database } from "../../server/db";
+import { accountQueries } from "../../server/account";
 import { logoutAction, resendVerificationAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +24,10 @@ export default async function AccountPage({
   const error = typeof query.error === "string" ? query.error : undefined;
   const notice = typeof query.notice === "string" ? query.notice : undefined;
   const [addresses, alerts, requests, wishlist] = await Promise.all([
-    listAddresses(database(), user.id),
-    listAlerts(database(), user.id),
-    listProductRequests(database(), user.id),
-    listWishlistProducts(database(), user.id),
+    accountQueries.addresses(user.id),
+    accountQueries.alerts(user.id),
+    accountQueries.productRequests(user.id),
+    accountQueries.wishlist(user.id),
   ]);
   return (
     <div className="section-shell account-page">

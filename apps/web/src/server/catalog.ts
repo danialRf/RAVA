@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 
 import {
   countStorefrontProducts,
@@ -45,6 +46,17 @@ export interface ProductCardModel {
 }
 
 const FALLBACK_IMAGE = "/products/bag.svg";
+
+const cachedCategories = unstable_cache(
+  async () => listCategoriesWithCounts(database()),
+  ["storefront-categories-v1"],
+  { revalidate: 300, tags: ["storefront-taxonomy"] },
+);
+const cachedBrands = unstable_cache(
+  async (limit: number) => listBrandsWithCounts(database(), limit),
+  ["storefront-brands-v1"],
+  { revalidate: 300, tags: ["storefront-taxonomy"] },
+);
 
 async function toCardModel(
   row: StorefrontProductRow,
@@ -108,13 +120,9 @@ export const listProductsBySlugs = cache(
     toCardModels(await listStorefrontProductsBySlugs(database(), slugs)),
 );
 
-export const listCategories = cache(async () =>
-  listCategoriesWithCounts(database()),
-);
+export const listCategories = cache(async () => cachedCategories());
 
-export const listBrands = cache(async (limit = 8) =>
-  listBrandsWithCounts(database(), limit),
-);
+export const listBrands = cache(async (limit = 8) => cachedBrands(limit));
 
 export const nextTrip = cache(async () => findNextOpenTrip(database()));
 

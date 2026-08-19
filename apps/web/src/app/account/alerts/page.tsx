@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import { listAlerts } from "@rava/db";
 import { formatToman } from "../../../lib/format";
 import { AccountNav, FormMessage } from "../../../components/account";
 import { PageIntro } from "../../../components/storefront";
 import { currentUser } from "../../../server/auth";
-import { database } from "../../../server/db";
+import { accountQueries } from "../../../server/account";
 import {
   cancelPriceAlertAction,
   createPriceAlertAction,
@@ -16,7 +15,7 @@ export default async function AlertsPage({
   const user = await currentUser();
   if (!user) redirect("/account/login");
   const [items, q] = await Promise.all([
-    listAlerts(database(), user.id),
+    accountQueries.alerts(user.id),
     searchParams,
   ]);
   return (

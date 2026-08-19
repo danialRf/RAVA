@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { listOwnedOrders } from "@rava/db";
-
 import { AccountNav } from "../../../components/account";
 import { PageIntro } from "../../../components/storefront";
 import { formatToman } from "../../../lib/format";
 import { currentUser } from "../../../server/auth";
-import { database } from "../../../server/db";
+import { accountQueries } from "../../../server/account";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -28,7 +26,7 @@ const statusLabels: Record<string, string> = {
 export default async function OrdersPage() {
   const user = await currentUser();
   if (!user) redirect("/account/login?next=%2Faccount%2Forders");
-  const orders = await listOwnedOrders(database(), user.id);
+  const orders = await accountQueries.orders(user.id);
 
   return (
     <div className="section-shell account-page order-page">

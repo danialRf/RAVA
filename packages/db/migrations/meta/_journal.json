@@ -22,6 +22,13 @@
       "when": 1787003480143,
       "tag": "0002_glorious_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787175000000,
+      "tag": "0003_storefront_search_indexes",
+      "breakpoints": true
     }
   ]
 }
