@@ -8,8 +8,9 @@ export default async function RegisterPage({
   const q = await searchParams;
   return (
     <AuthFrame
-      title="ساخت حساب"
-      copy="برای حفاظت بهتر، گذرواژه حداقل ۱۰ نویسه باشد."
+      mode="register"
+      title="ساخت حساب روا"
+      copy="اطلاعات اصلی را وارد کنید؛ ساخت حساب کمتر از یک دقیقه زمان می‌برد."
     >
       <FormMessage error={typeof q.error === "string" ? q.error : undefined} />
       <form action={registerAction} className="auth-form">
@@ -39,11 +40,14 @@ export default async function RegisterPage({
             required
           />
         </label>
-        <button className="button primary">ساخت حساب</button>
+        <small className="auth-password-hint">
+          رمز عبور باید حداقل ۱۰ نویسه داشته باشد.
+        </small>
+        <button className="button primary wide">ثبت‌نام</button>
       </form>
-      <div className="auth-links">
-        <Link href="/account/login">حساب دارم؛ وارد می‌شوم</Link>
-      </div>
+      <p className="auth-alternative">
+        قبلاً ثبت‌نام کرده‌اید؟ <Link href="/account/login">وارد شوید</Link>
+      </p>
     </AuthFrame>
   );
 }

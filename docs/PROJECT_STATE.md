@@ -43,6 +43,8 @@ Codex must update this file after every phase.
 - Product requests persist descriptions, links and budgets. Optional JPG/PNG/WebP images are limited to 5 MiB and stored privately through the S3-compatible abstraction.
 - Internal account/request states shown to customers are rendered in Persian.
 - The visual system now uses champagne gold as a visible secondary surface, supported by rose, peach and lilac tones translated from the supplied references; the system is documented in `docs/DESIGN_REFINEMENT.md`.
+- Store navigation now exposes the cart as a primary destination in both the desktop header and mobile bottom navigation.
+- Authentication uses one consistent two-state entry surface (`ورود` / `ثبت‌نام`): email/password remains the primary login path, password recovery stays contextual, and secondary OTP entry no longer competes on the main login screen.
 
 ### Cart, quote and deposit payment
 
@@ -101,7 +103,7 @@ Codex must update this file after every phase.
 - Real Google, SMS, SMTP and production storage integrations cannot be end-to-end verified until credentials are supplied.
 - `pnpm test` requires the local PostgreSQL infrastructure; `pnpm test:unit` does not.
 
-## Latest verification (2026-08-18)
+## Latest verification (2026-08-19)
 
 Passed after Phase 5 hardening:
 
@@ -114,6 +116,7 @@ Passed after Phase 5 hardening:
 - `pnpm worker:smoke`.
 - Production Next.js build — all application routes compiled, including the checkout, gateway and receipt routes.
 - `pnpm test:e2e` — 20 tests covering the storefront, account journeys, the full cart to locked quote to gateway deposit path, the card-to-card receipt path and responsive captures.
+- Responsive authentication checks cover the simplified entry surface and cart discoverability at mobile and desktop widths.
 - Visual review recorded in `docs/PHASE_5_UI_REVIEW.md`; captures are in `docs/phase-5-quote-390x844.png`, `docs/phase-5-order-390x844.png` and `docs/phase-5-card-receipt-390x844.png`.
 
 The repository is versioned on GitHub at `danialRf/RAVA`; CI generates Next.js route types before TypeScript checking so a clean runner matches local verification.

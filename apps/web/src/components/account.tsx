@@ -34,10 +34,12 @@ export function AccountNav() {
 }
 
 export function AuthFrame({
+  mode = "login",
   title,
   copy,
   children,
 }: {
+  mode?: "login" | "register";
   title: string;
   copy: string;
   children: React.ReactNode;
@@ -45,12 +47,44 @@ export function AuthFrame({
   return (
     <div className="section-shell auth-page">
       <div className="auth-card">
-        <Link className="auth-back" href="/account">
-          بازگشت به حساب
-        </Link>
-        <h1>{title}</h1>
-        <p>{copy}</p>
-        {children}
+        <div className="auth-card-main">
+          <Link
+            className="auth-brand"
+            href="/"
+            aria-label="بازگشت به صفحه اصلی روا"
+          >
+            <strong>روا</strong>
+            <bdi dir="ltr">RAVA</bdi>
+          </Link>
+          <nav className="auth-switch" aria-label="ورود یا ثبت‌نام">
+            <Link
+              href="/account/login"
+              aria-current={mode === "login" ? "page" : undefined}
+            >
+              ورود
+            </Link>
+            <Link
+              href="/account/register"
+              aria-current={mode === "register" ? "page" : undefined}
+            >
+              ثبت‌نام
+            </Link>
+          </nav>
+          <div className="auth-heading">
+            <h1>{title}</h1>
+            <p>{copy}</p>
+          </div>
+          {children}
+        </div>
+        <aside className="auth-assurance" aria-label="مزایای حساب روا">
+          <span>حساب روا</span>
+          <h2>خرید از آلمان، با مسیر روشن.</h2>
+          <p>
+            قیمت قطعی، وضعیت سفارش و رسیدهای شما در یک جای امن و ساده نگهداری
+            می‌شوند.
+          </p>
+          <Link href="/authenticity">روا چطور خرید می‌کند؟</Link>
+        </aside>
       </div>
     </div>
   );

@@ -29,6 +29,11 @@ test("renders the Persian RTL storefront without browser errors", async ({
   await expect(
     page.getByRole("navigation", { name: "ناوبری موبایل" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "ناوبری موبایل" }).getByRole("link", {
+      name: "سبد خرید",
+    }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -316,6 +321,24 @@ test("captures the account entry at mobile and desktop", async ({ page }) => {
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/account/login");
+    await expect(
+      page.getByRole("navigation", { name: "ورود یا ثبت‌نام" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "ورود", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.getByRole("link", { name: "ورود با شماره موبایل" }),
+    ).toHaveCount(0);
+    if (viewport.width >= 768) {
+      await expect(
+        page
+          .getByRole("navigation", { name: "ابزارهای فروشگاه" })
+          .getByRole("link", {
+            name: "سبد خرید",
+          }),
+      ).toBeVisible();
+    }
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.screenshot({
       path: `docs/phase-4-account-login-${viewport.name}.png`,

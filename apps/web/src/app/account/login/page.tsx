@@ -8,8 +8,9 @@ export default async function LoginPage({
   const q = await searchParams;
   return (
     <AuthFrame
-      title="ورود به روا"
-      copy="اطلاعات ورود فقط در سرور بررسی می‌شود."
+      mode="login"
+      title="خوش آمدید"
+      copy="برای دیدن سفارش‌ها و ادامه خرید وارد حساب خود شوید."
     >
       <FormMessage
         error={typeof q.error === "string" ? q.error : undefined}
@@ -41,13 +42,16 @@ export default async function LoginPage({
             required
           />
         </label>
-        <button className="button primary">ورود</button>
+        <div className="auth-form-row">
+          <Link href="/account/forgot-password">
+            رمز عبور را فراموش کرده‌اید؟
+          </Link>
+        </div>
+        <button className="button primary wide">ورود به حساب</button>
       </form>
-      <div className="auth-links">
-        <Link href="/account/forgot-password">گذرواژه را فراموش کرده‌ام</Link>
-        <Link href="/account/register">ساخت حساب تازه</Link>
-        <Link href="/account/otp">ورود با شماره موبایل</Link>
-      </div>
+      <p className="auth-alternative">
+        حساب ندارید؟ <Link href="/account/register">ثبت‌نام کنید</Link>
+      </p>
     </AuthFrame>
   );
 }

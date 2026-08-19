@@ -36,6 +36,10 @@ export function Header({ announcement }: { announcement: string }) {
             <span>جست‌وجوی محصول، برند یا مدل</span>
           </Link>
           <nav className="desktop-actions" aria-label="ابزارهای فروشگاه">
+            <Link className="header-cart-link" href="/cart">
+              <Icon name="bag" width="22" />
+              سبد خرید
+            </Link>
             <Link href="/account">
               <Icon name="user" width="21" />
               حساب من
@@ -62,7 +66,7 @@ export function BottomNav() {
     ["home", "خانه", "/"],
     ["grid", "دسته‌بندی", "/category"],
     ["search", "جست‌وجو", "/search"],
-    ["heart", "علاقه‌مندی", "/wishlist"],
+    ["bag", "سبد خرید", "/cart"],
     ["user", "حساب من", "/account"],
   ] as const;
   return (

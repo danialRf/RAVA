@@ -1380,6 +1380,10 @@ p {
     gap: 0.35rem;
     font-size: 0.78rem;
   }
+  .desktop-actions .header-cart-link {
+    color: var(--rava-burgundy-dark);
+    font-weight: 750;
+  }
   .cart-count {
     min-width: 20px;
     height: 20px;
@@ -2159,17 +2163,105 @@ body {
 
 /* Account and authentication */
 .auth-page {
-  min-height: 70svh;
-  padding-block: 2rem 4rem;
+  min-height: 72svh;
+  padding-block: 1.5rem 4rem;
   display: grid;
   place-items: start center;
 }
 .auth-card {
-  width: min(100%, 30rem);
-  padding: 1.5rem;
-  border: 1px solid var(--rava-border);
-  border-radius: var(--rava-radius-card);
+  width: min(100%, 64rem);
+  display: grid;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--rava-gold) 45%, var(--rava-border));
+  border-radius: 20px;
   background: var(--rava-paper);
+  box-shadow: 0 24px 70px rgba(72, 49, 40, 0.1);
+}
+.auth-card-main {
+  padding: 1.4rem;
+}
+.auth-brand {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+.auth-brand strong {
+  color: var(--rava-burgundy-dark);
+  font-size: 1.45rem;
+}
+.auth-brand bdi {
+  color: var(--rava-muted-ink);
+  font: 700 0.6rem/1 var(--rava-font-latin);
+  letter-spacing: 0.17em;
+}
+.auth-switch {
+  margin: 1rem 0 1.5rem;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--rava-border);
+  border-radius: var(--rava-radius-control);
+  background: var(--rava-ivory);
+}
+.auth-switch a {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--rava-radius-control) - 3px);
+  color: var(--rava-muted-ink);
+  font-weight: 750;
+}
+.auth-switch a[aria-current="page"] {
+  background: var(--rava-paper);
+  color: var(--rava-burgundy-dark);
+  box-shadow: 0 3px 12px rgba(72, 49, 40, 0.08);
+}
+.auth-heading h1 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.65rem, 5vw, 2.1rem);
+}
+.auth-heading p {
+  max-width: 35rem;
+  color: var(--rava-muted-ink);
+  font-size: 0.88rem;
+}
+.auth-assurance {
+  min-height: 230px;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), transparent 50%),
+    var(--rava-burgundy-dark);
+  color: white;
+}
+.auth-assurance > span {
+  color: #f0d49b;
+  font-size: 0.74rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+.auth-assurance h2 {
+  max-width: 12ch;
+  margin: 0.8rem 0;
+  font-size: clamp(1.7rem, 7vw, 2.6rem);
+  line-height: 1.45;
+}
+.auth-assurance p {
+  max-width: 30rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.86rem;
+}
+.auth-assurance a {
+  width: fit-content;
+  min-height: 44px;
+  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  color: #f4dda9;
+  font-weight: 700;
 }
 
 /* Phase 5 — cart, locked quote and deposit checkout */
@@ -2359,20 +2451,8 @@ body {
     top: 9rem;
   }
 }
-.auth-card h1 {
-  margin: 0.8rem 0 0.35rem;
-  font-size: 1.8rem;
-}
-.auth-card > p,
 .muted {
   color: var(--rava-muted-ink);
-}
-.auth-back {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  color: var(--rava-burgundy);
-  font-size: 0.78rem;
 }
 .auth-form {
   display: grid;
@@ -2398,18 +2478,35 @@ body {
   min-height: 90px;
   resize: vertical;
 }
-.auth-links {
-  margin-top: 1rem;
+.auth-form-row {
+  margin-top: -0.25rem;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  justify-content: flex-end;
 }
-.auth-links a {
-  min-height: 40px;
+.auth-form-row a {
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   color: var(--rava-burgundy);
   font-size: 0.75rem;
+}
+.auth-password-hint {
+  margin-top: -0.35rem;
+  color: var(--rava-muted-ink);
+  font-size: 0.72rem;
+}
+.auth-alternative {
+  margin-top: 1.1rem;
+  color: var(--rava-muted-ink);
+  text-align: center;
+  font-size: 0.8rem;
+}
+.auth-alternative a {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--rava-burgundy);
+  font-weight: 750;
 }
 .form-message {
   margin: 1rem 0;
@@ -2683,7 +2780,14 @@ button.danger {
     padding-block: 4rem 6rem;
   }
   .auth-card {
-    padding: 2rem;
+    grid-template-columns: minmax(0, 1.05fr) minmax(18rem, 0.8fr);
+  }
+  .auth-card-main {
+    padding: 2.5rem 3rem;
+  }
+  .auth-assurance {
+    min-height: 590px;
+    padding: 3rem;
   }
   .account-entry,
   .address-layout,
