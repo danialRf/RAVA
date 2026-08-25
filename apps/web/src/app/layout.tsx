@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import "@fontsource-variable/vazirmatn";
 import "@rava/ui/styles/tokens.css";
 import "./styles.css";
@@ -38,6 +39,9 @@ export const viewport: Viewport = {
  * rather than promising a window we do not have.
  */
 async function announcement(): Promise<string> {
+  // Trip availability changes independently of deployments. Defer this query
+  // to request time so production builds never require a live database.
+  await connection();
   const trip = await nextTrip();
   if (trip?.departureWindowStart == null) {
     return "سفارش‌ها برای سفر بعدی جمع‌آوری می‌شود";

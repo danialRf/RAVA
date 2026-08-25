@@ -74,6 +74,8 @@ Codex must update this file after every phase.
 
 - Next.js App Router web app plus a separate worker inside the TypeScript monorepo; no premature microservices.
 - Phase 6 has started with centralized least-privilege RBAC and a server-protected admin route. The first operational read models cover overview totals, orders, payment review, procurement and the append-only audit log; every value comes from persisted rows.
+- Card-to-card review is now a finance-only, reason-required transaction: approval validates the locked deposit, credits the order, creates idempotent buyer tasks, advances history, emits the outbox event and writes audit; rejection credits nothing and records its reason. Receipt bytes remain private and are streamed only through an authenticated, no-store staff route.
+- Buyer actions (`assign to self`, `start`, `mark unavailable`) follow the domain state machines and write an audit event in the same transaction. Gateway deposits and approved card receipts share one idempotent procurement-task factory so their queues cannot drift.
 - Staff roles are `OWNER`, `ADMIN`, `MERCHANDISER`, `BUYER_GERMANY`, `SUPPORT`, `FINANCE` and `CONTENT_EDITOR`. The legacy `OPERATOR` value remains read-only for migration compatibility and should be reassigned explicitly.
 - The persistent storefront header owns a semantic inline search form; `/search` receives the query and renders results rather than acting as an intermediate query-entry step.
 - Request-scoped composition stays in `apps/web/src/server`; pure policy stays in `@rava/domain`; persistence stays in `@rava/db`.
@@ -123,7 +125,7 @@ Passed after Phase 5 hardening:
 - `pnpm format` and `pnpm format:check`.
 - `pnpm lint`.
 - `pnpm typecheck` across all workspace packages.
-- `pnpm test` — 14 files, 158 tests, including live PostgreSQL migrations, admin read models/RBAC, repositories, payment callbacks and upload-signature validation.
+- `pnpm test` — 14 files, 160 tests, including live PostgreSQL migrations, audited payment review/procurement actions, admin read models/RBAC, repositories, payment callbacks and upload-signature validation.
 - `pnpm db:generate` — no schema drift.
 - `pnpm db:migrate` against local PostgreSQL.
 - `pnpm worker:smoke`.
@@ -137,4 +139,4 @@ CI uses the deterministic private-storage adapter because its service matrix doe
 
 ## Next phase
 
-Continue Phase 6 — add audited payment review and procurement actions, then catalog/pricing editors, trips, customers, sources, content and health screens. Pricing settings must expose every pricing factor except the provider-owned live FX rate.
+Continue Phase 6 — add purchase completion with actual EUR cost/private receipt, then catalog/pricing editors, trips, customers, sources, content and health screens. Pricing settings must expose every pricing factor except the provider-owned live FX rate.

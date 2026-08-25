@@ -1773,6 +1773,84 @@ p {
   color: var(--rava-gold-deep);
   background: var(--rava-gold-pale);
 }
+.admin-feedback {
+  margin-bottom: 1rem;
+  padding: 0.7rem 0.8rem;
+  border-inline-start: 3px solid currentColor;
+  font-size: 0.75rem;
+}
+.admin-feedback.success {
+  color: var(--rava-success);
+  background: var(--rava-sage-soft);
+}
+.admin-feedback.error {
+  color: var(--rava-error);
+  background: var(--rava-rose-soft);
+}
+.admin-review-form {
+  grid-column: 1 / -1;
+  padding-top: 0.8rem;
+  display: grid;
+  gap: 0.7rem;
+  border-top: 1px dashed var(--rava-border);
+}
+.admin-receipt-link {
+  width: fit-content;
+  margin-top: 0.2rem;
+  color: var(--rava-burgundy);
+  font-size: 0.72rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.admin-review-form label,
+.procurement-actions label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--rava-muted-ink);
+  font-size: 0.7rem;
+}
+.admin-review-form input,
+.procurement-actions input {
+  width: 100%;
+  min-height: 44px;
+  padding-inline: 0.7rem;
+  border: 1px solid var(--rava-border);
+  background: white;
+}
+.admin-review-form > div,
+.procurement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.admin-review-form .button,
+.procurement-actions .button {
+  min-height: 42px;
+  padding-inline: 0.9rem;
+  border: 1px solid var(--rava-border);
+}
+.admin-review-form .button.danger,
+.procurement-actions .button.danger {
+  border-color: color-mix(in srgb, var(--rava-error) 35%, var(--rava-border));
+  background: white;
+}
+.procurement-actions {
+  margin-top: 0.75rem;
+}
+.procurement-actions details {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--rava-border);
+}
+.procurement-actions summary {
+  cursor: pointer;
+  color: var(--rava-error);
+  font-size: 0.72rem;
+}
+.procurement-actions details[open] {
+  display: grid;
+  gap: 0.6rem;
+}
 @media (min-width: 64rem) {
   .admin-shell {
     grid-template-columns: 15rem minmax(0, 1fr);

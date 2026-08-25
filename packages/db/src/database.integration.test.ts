@@ -54,14 +54,17 @@ import {
   listStorefrontProductsBySlugs,
   recordOfferObservation,
   recordRateLimitAttempt,
+  reviewCardPayment,
   replaceWishlistFromSlugs,
   resolvePricingRule,
   searchPublishedProducts,
   setDefaultAddress,
   transitionOrderStatus,
+  updateProcurementItem,
   issueVerificationToken,
 } from "./repositories";
 import {
+  adminAuditLog,
   addresses,
   brands,
   cartItems,
@@ -77,6 +80,7 @@ import {
   pricingRules,
   productVariants,
   products,
+  purchaseTasks,
   quotes,
   retailers,
   reviews,
@@ -1541,6 +1545,7 @@ describe("checkout repository", () => {
     const [reloaded] = await db.select().from(orders);
     expect(reloaded?.status).toBe("PROCUREMENT_PENDING");
     expect(reloaded?.depositPaidToman).toBe(order.depositRequiredToman);
+    expect(await db.select().from(purchaseTasks)).toHaveLength(1);
 
     const events = await db.select().from(outboxEvents);
     expect(
@@ -1649,6 +1654,125 @@ describe("checkout repository", () => {
     const [reloaded] = await db.select().from(orders);
     expect(reloaded?.depositPaidToman).toBe(0n);
     expect(reloaded?.status).toBe("DEPOSIT_PENDING");
+  });
+
+  it("approves a card receipt atomically and creates an audited procurement task", async () => {
+    const fixture = await createCheckoutFixture();
+    const quote = await persistTestQuote(fixture);
+    const order = await createOrderFromQuote(db, {
+      quoteId: quote.id,
+      userId: fixture.user.id,
+      addressId: fixture.address.id,
+    });
+    const payment = await createPaymentIntent(db, {
+      orderId: order.id,
+      method: "CARD_TO_CARD",
+      provider: "manual",
+      amountToman: order.depositRequiredToman,
+      idempotencyKey: `review:${order.id}:approve`,
+    });
+    await submitPaymentReceipt(db, {
+      paymentId: payment.id,
+      userId: fixture.user.id,
+      storageKey: "payment-receipts/test/approve.jpg",
+      contentType: "image/jpeg",
+      byteSize: 2_048,
+    });
+    const [reviewer] = await db
+      .insert(users)
+      .values({ email: "finance@example.com", role: "FINANCE" })
+      .returning();
+    if (!reviewer) throw new Error("Reviewer fixture missing");
+
+    await reviewCardPayment(db, {
+      paymentId: payment.id,
+      actorUserId: reviewer.id,
+      decision: "APPROVE",
+      reason: "مبلغ و رسید تطبیق داده شد",
+    });
+
+    const [storedPayment] = await db.select().from(payments);
+    const [storedOrder] = await db.select().from(orders);
+    const [receipt] = await db.select().from(paymentReceipts);
+    const tasks = await db.select().from(purchaseTasks);
+    const audit = await db.select().from(adminAuditLog);
+    expect(storedPayment?.status).toBe("SUCCEEDED");
+    expect(storedOrder?.status).toBe("PROCUREMENT_PENDING");
+    expect(storedOrder?.depositPaidToman).toBe(order.depositRequiredToman);
+    expect(receipt?.reviewedByUserId).toBe(reviewer.id);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.status).toBe("OPEN");
+    expect(audit[0]?.action).toBe("payment.card_receipt_approved");
+
+    const itemId = tasks[0]?.orderItemId;
+    if (!itemId) throw new Error("Purchase task fixture missing");
+    await updateProcurementItem(db, {
+      orderItemId: itemId,
+      actorUserId: reviewer.id,
+      action: "ASSIGN_TO_SELF",
+    });
+    await updateProcurementItem(db, {
+      orderItemId: itemId,
+      actorUserId: reviewer.id,
+      action: "START",
+    });
+    await updateProcurementItem(db, {
+      orderItemId: itemId,
+      actorUserId: reviewer.id,
+      action: "MARK_UNAVAILABLE",
+      reason: "کالا در منبع ثبت‌شده موجود نبود",
+    });
+    const [updatedTask] = await db.select().from(purchaseTasks);
+    const [updatedItem] = await db.select().from(orderItems);
+    expect(updatedTask?.status).toBe("BLOCKED");
+    expect(updatedItem?.procurementStatus).toBe("UNAVAILABLE");
+    expect(await db.select().from(adminAuditLog)).toHaveLength(4);
+  });
+
+  it("rejects a card receipt with a reason without crediting the order", async () => {
+    const fixture = await createCheckoutFixture();
+    const quote = await persistTestQuote(fixture);
+    const order = await createOrderFromQuote(db, {
+      quoteId: quote.id,
+      userId: fixture.user.id,
+      addressId: fixture.address.id,
+    });
+    const payment = await createPaymentIntent(db, {
+      orderId: order.id,
+      method: "CARD_TO_CARD",
+      provider: "manual",
+      amountToman: order.depositRequiredToman,
+      idempotencyKey: `review:${order.id}:reject`,
+    });
+    await submitPaymentReceipt(db, {
+      paymentId: payment.id,
+      userId: fixture.user.id,
+      storageKey: "payment-receipts/test/reject.jpg",
+      contentType: "image/jpeg",
+      byteSize: 2_048,
+    });
+    const [reviewer] = await db
+      .insert(users)
+      .values({ email: "finance-reject@example.com", role: "FINANCE" })
+      .returning();
+    if (!reviewer) throw new Error("Reviewer fixture missing");
+
+    await reviewCardPayment(db, {
+      paymentId: payment.id,
+      actorUserId: reviewer.id,
+      decision: "REJECT",
+      reason: "مبلغ رسید با درخواست تطبیق ندارد",
+    });
+
+    const [storedPayment] = await db.select().from(payments);
+    const [storedOrder] = await db.select().from(orders);
+    expect(storedPayment?.status).toBe("FAILED");
+    expect(storedOrder?.status).toBe("DEPOSIT_PENDING");
+    expect(storedOrder?.depositPaidToman).toBe(0n);
+    expect(await db.select().from(purchaseTasks)).toEqual([]);
+    expect((await db.select().from(adminAuditLog))[0]?.action).toBe(
+      "payment.card_receipt_rejected",
+    );
   });
 
   it("does not expose a payment or order to another customer", async () => {

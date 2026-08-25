@@ -24,6 +24,7 @@ import {
   sourceOffers,
 } from "../schema";
 import type { Executor } from "./executor";
+import { ensurePurchaseTasksForOrder } from "./procurement";
 
 export interface CartOwner {
   readonly userId?: string | null;
@@ -595,6 +596,7 @@ export async function completeGatewayDeposit(
     if (!order || order.status !== "DEPOSIT_PENDING")
       throw new Error("ORDER_NOT_PAYABLE");
     const now = new Date();
+    await ensurePurchaseTasksForOrder(tx, order.id);
     const [updatedPayment] = await tx
       .update(payments)
       .set({

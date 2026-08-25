@@ -95,16 +95,35 @@ export async function listPaymentsNeedingReview(
       status: payments.status,
       customerName: users.displayName,
       customerEmail: users.email,
-      receiptId: paymentReceipts.id,
+      receiptId: sql<
+        string | null
+      >`(select ${paymentReceipts.id} from ${paymentReceipts} where ${paymentReceipts.paymentId} = ${payments.id} order by ${paymentReceipts.createdAt} desc limit 1)`.as(
+        "receipt_id",
+      ),
       createdAt: payments.createdAt,
     })
     .from(payments)
     .innerJoin(orders, eq(orders.id, payments.orderId))
     .innerJoin(users, eq(users.id, orders.userId))
-    .leftJoin(paymentReceipts, eq(paymentReceipts.paymentId, payments.id))
     .where(eq(payments.status, "PENDING_VERIFICATION"))
     .orderBy(payments.createdAt)
     .limit(limit);
+}
+
+export async function getPaymentReceiptForAdmin(
+  executor: Executor,
+  receiptId: string,
+) {
+  const [receipt] = await executor
+    .select({
+      id: paymentReceipts.id,
+      storageKey: paymentReceipts.storageKey,
+      contentType: paymentReceipts.contentType,
+    })
+    .from(paymentReceipts)
+    .where(eq(paymentReceipts.id, receiptId))
+    .limit(1);
+  return receipt ?? null;
 }
 
 export async function listProcurementQueue(executor: Executor, limit = 50) {
@@ -119,10 +138,19 @@ export async function listProcurementQueue(executor: Executor, limit = 50) {
       quantity: orderItems.quantity,
       maxSourcePriceEurCents: orderItems.maxSourcePriceEurCents,
       procurementStatus: orderItems.procurementStatus,
+      taskStatus: purchaseTasks.status,
+      assignedToUserId: purchaseTasks.assignedToUserId,
       createdAt: orderItems.createdAt,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .leftJoin(
+      purchaseTasks,
+      and(
+        eq(purchaseTasks.orderItemId, orderItems.id),
+        inArray(purchaseTasks.status, ["OPEN", "ASSIGNED", "IN_PROGRESS"]),
+      ),
+    )
     .where(
       and(
         inArray(orders.status, [...PROCUREMENT_ORDER_STATUSES]),
