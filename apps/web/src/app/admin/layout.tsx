@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
-import { AdminNavigation } from "../../components/admin";
+import { AdminNavigation, AdminTopbar } from "../../components/admin";
 import { requireAdmin } from "../../server/admin";
+import { adminLogoutAction } from "./actions";
 
 export const metadata: Metadata = {
   title: { default: "مدیریت", template: "%s | مدیریت روا" },
@@ -12,10 +13,19 @@ export default async function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const user = await requireAdmin();
+  const displayName = user.displayName ?? user.email ?? "همکار روا";
   return (
-    <div className="admin-shell">
+    <div className="admin-app">
       <AdminNavigation user={user} />
-      <section className="admin-content">{children}</section>
+      <div className="admin-workspace">
+        <AdminTopbar
+          displayName={displayName}
+          logoutAction={adminLogoutAction}
+        />
+        <main id="main-content" className="admin-content">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

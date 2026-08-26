@@ -2,17 +2,19 @@
 
 Codex must update this file after every phase.
 
-## Architecture and performance hardening (in progress)
+## Architecture and performance hardening
 
 - Storefront pricing now loads the active pricing-rule set once per server render and resolves product/category/brand/price-band precedence in a pure selector. Product grids no longer issue one pricing-rule query per product.
 - The selector has focused tests for specificity, priority/time tie-breaking and half-open price bands. Application-service boundaries, storefront caching/search indexes and CI runtime remain the next hardening milestones.
 - CI caches the Playwright browser separately from OS dependencies and performs one production build instead of rebuilding immediately before E2E.
 - Account pages read through a dedicated server-side application service instead of receiving database handles. Stable public taxonomy uses a bounded five-minute server cache; product money/stock rows, personalized data, checkout and payment remain uncached because integer money must not pass through a JSON-only cache boundary.
 - PostgreSQL trigram indexes cover Persian/original titles, descriptions and brand names so the launch `ILIKE` search path remains usable as the catalog grows.
+- Storefront and admin use separate App Router layouts without changing public URLs. Admin requests no longer render storefront navigation/footer or query the next shopping trip; the root layout owns only document-level concerns.
+- The admin is a dedicated RTL operations workspace with active navigation, identity and role visibility, store preview/logout controls, actionable queue shortcuts and an honest list of modules that are not built yet.
 
 ## Current phase
 
-`PHASE_5_CHECKOUT_PAYMENTS_COMPLETE`
+`PHASE_6_ADMIN_OPERATIONS_IN_PROGRESS`
 
 ## Completed
 
@@ -23,6 +25,8 @@ Codex must update this file after every phase.
 - Phase 4 authentication and customer accounts — 2026-08-18.
 - Phase 5 cart, binding quote and deposit payment — 2026-08-18.
 - Beauty-editorial storefront art direction and Vazirmatn/B-Vazir typography refinement — 2026-08-18.
+
+- Phase 6 admin foundation, RBAC, audited payment/procurement actions and dedicated operations workspace — 2026-08-26.
 
 ## Delivered foundations
 
@@ -93,6 +97,7 @@ Codex must update this file after every phase.
 - `pnpm-workspace.yaml` uses the local `.pnpm-store` to avoid redirected-profile prompts.
 - The E2E runner owns port `3210`, so it does not collide with development port `3000`.
 - Fake/dev providers remain active and do not block local development.
+- Next development mode detects this checkout under `Downloads/Compressed` as a slow filesystem (roughly 300–750 ms on this machine). Cold route compilation can therefore take tens of seconds; production-build behavior is the meaningful baseline. Moving a working copy to a short local path such as `C:\dev\RAVA` is recommended but was not performed automatically.
 
 ## Open external credentials
 
@@ -107,7 +112,7 @@ Codex must update this file after every phase.
 ## Known limitations
 
 - Only the deposit is collected. Balance settlement, refunds and the remaining order lifecycle beyond `PROCUREMENT_PENDING` are later phases.
-- Card-to-card receipts are stored and marked `PENDING_VERIFICATION`; the operator screen that approves them arrives with the admin (Phase 6).
+- Card-to-card receipts remain `PENDING_VERIFICATION` until an authorized finance user approves or rejects them in the admin payment queue.
 - The gateway is `FakePaymentGateway` behind the `PaymentGateway` interface, including a local approval screen that stands in for the bank. No production gateway is wired.
 - Authenticity remains a presentation shell.
 - Variant selection is not yet the interactive checkout selector.
@@ -118,7 +123,15 @@ Codex must update this file after every phase.
 - Real Google, SMS, SMTP and production storage integrations cannot be end-to-end verified until credentials are supplied.
 - `pnpm test` requires the local PostgreSQL infrastructure; `pnpm test:unit` does not.
 
-## Latest verification (2026-08-20)
+## Latest verification (2026-08-26)
+
+Passed after the admin workspace/layout separation:
+
+- `pnpm format:check`, `pnpm lint` and workspace-wide `pnpm typecheck`.
+- `pnpm test` — 14 files and 160 tests passed.
+- Production Next.js build — all 38 application routes compiled successfully.
+- `pnpm test:e2e` — all 22 storefront, account, checkout, RBAC and responsive tests passed.
+- Warm production checks on this machine: storefront 74–94 ms, health 8–12 ms and guest admin RBAC redirect 19–56 ms after first request.
 
 Passed after Phase 5 hardening:
 

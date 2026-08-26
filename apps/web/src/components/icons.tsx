@@ -13,7 +13,13 @@ export function Icon({
     | "bag"
     | "arrow"
     | "shield"
-    | "filter";
+    | "filter"
+    | "orders"
+    | "payment"
+    | "truck"
+    | "history"
+    | "external"
+    | "logout";
 }) {
   const paths = {
     home: (
@@ -66,6 +72,43 @@ export function Icon({
     filter: (
       <>
         <path d="M4 6h16M7 12h10M10 18h4" />
+      </>
+    ),
+    orders: (
+      <>
+        <path d="M6 3h12v18H6z" />
+        <path d="M9 8h6M9 12h6M9 16h4" />
+      </>
+    ),
+    payment: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 10h18M7 15h3" />
+      </>
+    ),
+    truck: (
+      <>
+        <path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z" />
+        <circle cx="7" cy="19" r="2" />
+        <circle cx="18" cy="19" r="2" />
+      </>
+    ),
+    history: (
+      <>
+        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+        <path d="M3 3v5h5M12 7v5l3 2" />
+      </>
+    ),
+    external: (
+      <>
+        <path d="M14 4h6v6M20 4l-9 9" />
+        <path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6" />
+      </>
+    ),
+    logout: (
+      <>
+        <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5" />
+        <path d="M14 8l4 4-4 4M18 12H8" />
       </>
     ),
   };

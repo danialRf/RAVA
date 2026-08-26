@@ -1,12 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { connection } from "next/server";
 import "@fontsource-variable/vazirmatn";
 import "@rava/ui/styles/tokens.css";
 import "./styles.css";
-import { BottomNav, Footer, Header } from "../components/storefront";
 import { siteUrl } from "../lib/site";
-import { nextTrip } from "../server/catalog";
-import { formatDate } from "../lib/format";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
@@ -32,24 +28,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-/**
- * Announcement copy.
- *
- * Built from the next open trip when one exists; otherwise it stays generic
- * rather than promising a window we do not have.
- */
-async function announcement(): Promise<string> {
-  // Trip availability changes independently of deployments. Defer this query
-  // to request time so production builds never require a live database.
-  await connection();
-  const trip = await nextTrip();
-  if (trip?.departureWindowStart == null) {
-    return "سفارش‌ها برای سفر بعدی جمع‌آوری می‌شود";
-  }
-  return `پنجره سفارش سفر بعدی تا ${formatDate(trip.departureWindowStart)} باز است`;
-}
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -58,10 +37,7 @@ export default async function RootLayout({
         <a className="skip-link" href="#main-content">
           رفتن به محتوای اصلی
         </a>
-        <Header announcement={await announcement()} />
-        <main id="main-content">{children}</main>
-        <Footer />
-        <BottomNav />
+        {children}
       </body>
     </html>
   );

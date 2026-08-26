@@ -409,7 +409,7 @@ test("publishes a crawlable sitemap and robots policy", async ({ request }) => {
 test("protects the admin operating system from guests", async ({ page }) => {
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/account\/login\?next=%2Fadmin$/);
-  await expect(page.locator(".admin-shell")).toHaveCount(0);
+  await expect(page.locator(".admin-app")).toHaveCount(0);
 });
 
 test("denies the admin operating system to customer accounts", async ({
@@ -427,7 +427,7 @@ test("denies the admin operating system to customer accounts", async ({
 
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/account$/);
-  await expect(page.locator(".admin-shell")).toHaveCount(0);
+  await expect(page.locator(".admin-app")).toHaveCount(0);
 });
 
 for (const viewport of [

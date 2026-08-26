@@ -1878,6 +1878,191 @@ p {
   }
 }
 
+/* Dedicated admin workspace. It intentionally does not inherit storefront chrome. */
+.admin-app {
+  min-height: 100vh;
+  display: grid;
+  color: #18201f;
+  background: #f2f0ea;
+}
+.admin-workspace {
+  min-width: 0;
+}
+.admin-sidebar {
+  border: 0;
+  border-bottom: 1px solid #303b38;
+  color: #f8f3e9;
+  background: #17201e;
+}
+.admin-brand a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  color: #fff;
+}
+.admin-brand span {
+  color: #e7c978;
+  font-size: 1.55rem;
+  font-weight: 800;
+}
+.admin-brand small {
+  color: #aab4b0;
+  font: 600 0.58rem/1 var(--rava-font-latin);
+  letter-spacing: 0.12em;
+}
+.admin-sidebar nav a {
+  gap: 0.65rem;
+  border-color: transparent;
+  color: #d8dfdc;
+  background: transparent;
+}
+.admin-sidebar nav a:hover,
+.admin-sidebar nav a:focus-visible,
+.admin-sidebar nav a[aria-current="page"] {
+  border-color: color-mix(in srgb, #e7c978 30%, transparent);
+  color: #fff;
+  background: #26322f;
+}
+.admin-sidebar nav a[aria-current="page"] {
+  box-shadow: inset -3px 0 #e7c978;
+}
+.admin-sidebar nav svg {
+  flex: 0 0 auto;
+  color: #e7c978;
+}
+.admin-next-modules {
+  border-color: #34413d;
+  color: #aab4b0;
+}
+.admin-next-modules span {
+  color: #e7c978;
+}
+.admin-identity {
+  padding-top: 0.8rem;
+  display: grid;
+  border-top: 1px solid #34413d;
+}
+.admin-identity small {
+  color: #e7c978;
+  font: 600 0.62rem/1.5 var(--rava-font-latin);
+}
+.admin-topbar {
+  min-height: 66px;
+  padding: 0.7rem clamp(1rem, 3vw, 2rem);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid #d9d5ca;
+  background: color-mix(in srgb, #fff 92%, transparent);
+}
+.admin-topbar > div:first-child {
+  display: grid;
+}
+.admin-topbar span {
+  color: #6c7471;
+  font-size: 0.66rem;
+}
+.admin-topbar strong {
+  font-size: 0.82rem;
+}
+.admin-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.admin-topbar-actions a,
+.admin-topbar-actions button {
+  min-height: 38px;
+  padding-inline: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #d7d1c5;
+  color: #414b48;
+  background: #fff;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.admin-topbar-actions a:hover,
+.admin-topbar-actions button:hover {
+  border-color: #a88b43;
+}
+.admin-content {
+  width: min(100%, 84rem);
+  min-height: calc(100vh - 66px);
+  margin-inline: auto;
+  border: 0;
+  background: transparent;
+}
+.admin-command-bar {
+  margin-bottom: 1rem;
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid #d7d1c5;
+  border-inline-start: 4px solid #9e7c2f;
+  background: #fff;
+}
+.admin-command-bar > div {
+  display: grid;
+  margin-inline-end: auto;
+}
+.admin-command-bar span {
+  color: #737b78;
+  font-size: 0.65rem;
+}
+.admin-command-bar a {
+  min-height: 42px;
+  padding-inline: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7d1c5;
+  background: #faf9f6;
+  font-size: 0.72rem;
+}
+.admin-command-bar a:first-of-type {
+  border-color: #76364a;
+  color: #fff;
+  background: #76364a;
+}
+.admin-metrics > * {
+  background: #fff;
+}
+.admin-metrics a {
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+.admin-metrics a:hover {
+  border-color: #9e7c2f;
+  transform: translateY(-2px);
+}
+.admin-metrics small {
+  color: #8a7040;
+  font-size: 0.62rem;
+}
+@media (min-width: 48rem) {
+  .admin-command-bar {
+    grid-template-columns: minmax(9rem, 1fr) repeat(3, auto);
+    align-items: center;
+  }
+}
+@media (min-width: 64rem) {
+  .admin-app {
+    grid-template-columns: 16rem minmax(0, 1fr);
+  }
+  .admin-sidebar {
+    min-height: 100vh;
+    position: sticky;
+    top: 0;
+    border-bottom: 0;
+    border-inline-end: 1px solid #303b38;
+  }
+}
+
 /* Champagne editorial refinement — inspired by the supplied beauty cards. */
 body {
   font-family: var(--rava-font-sans);

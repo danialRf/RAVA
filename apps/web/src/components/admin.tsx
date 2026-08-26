@@ -1,36 +1,69 @@
 import Link from "next/link";
 import { hasAdminPermission, type SessionPrincipal } from "@rava/domain";
 
+import { AdminNavLinks, type AdminNavItem } from "./admin-nav-links";
+import { Icon } from "./icons";
+
 const NAVIGATION = [
-  ["نمای کلی", "/admin", "OVERVIEW_READ"],
-  ["سفارش‌ها", "/admin/orders", "ORDERS_READ"],
-  ["تدارکات", "/admin/procurement", "PROCUREMENT_READ"],
-  ["پرداخت‌های نیازمند بررسی", "/admin/payments", "PAYMENTS_READ"],
-  ["گزارش ممیزی", "/admin/audit", "AUDIT_READ"],
+  ["نمای کلی", "/admin", "OVERVIEW_READ", "home"],
+  ["سفارش‌ها", "/admin/orders", "ORDERS_READ", "orders"],
+  ["تدارکات و خرید", "/admin/procurement", "PROCUREMENT_READ", "truck"],
+  ["بررسی پرداخت‌ها", "/admin/payments", "PAYMENTS_READ", "payment"],
+  ["تاریخچه ممیزی", "/admin/audit", "AUDIT_READ", "history"],
 ] as const;
 
 export function AdminNavigation({ user }: { user: SessionPrincipal }) {
+  const items = NAVIGATION.filter(([, , permission]) =>
+    hasAdminPermission(user.role, permission),
+  ).map(([label, href, , icon]) => ({ label, href, icon })) as AdminNavItem[];
+
   return (
     <aside className="admin-sidebar">
-      <div>
-        <p>سیستم عملیاتی روا</p>
-        <strong>{user.displayName ?? user.email ?? "همکار روا"}</strong>
+      <div className="admin-brand">
+        <Link href="/admin" aria-label="مرکز عملیات روا">
+          <span>روا</span>
+          <small>RAVA OPERATIONS</small>
+        </Link>
+      </div>
+      <AdminNavLinks items={items} />
+      <div className="admin-next-modules">
+        <span>در صف توسعه</span>
+        <small>کاتالوگ، قیمت‌گذاری، سفرها، مشتریان و منابع خرید</small>
+      </div>
+      <div className="admin-identity">
+        <span>{user.displayName ?? user.email ?? "همکار روا"}</span>
         <small dir="ltr">{user.role}</small>
       </div>
-      <nav aria-label="ناوبری مدیریت">
-        {NAVIGATION.filter(([, , permission]) =>
-          hasAdminPermission(user.role, permission),
-        ).map(([label, href]) => (
-          <Link href={href} key={href}>
-            {label}
-          </Link>
-        ))}
-      </nav>
-      <div className="admin-next-modules">
-        <span>در ادامه فاز ۶</span>
-        <small>کاتالوگ، قیمت‌گذاری، سفرها، مشتریان، محتوا و منابع</small>
-      </div>
     </aside>
+  );
+}
+
+export function AdminTopbar({
+  displayName,
+  logoutAction,
+}: {
+  displayName: string;
+  logoutAction: () => Promise<void>;
+}) {
+  return (
+    <header className="admin-topbar">
+      <div>
+        <span>مرکز عملیات</span>
+        <strong>{displayName}</strong>
+      </div>
+      <div className="admin-topbar-actions">
+        <Link href="/" target="_blank">
+          <Icon name="external" width="17" height="17" />
+          مشاهده فروشگاه
+        </Link>
+        <form action={logoutAction}>
+          <button type="submit">
+            <Icon name="logout" width="17" height="17" />
+            خروج
+          </button>
+        </form>
+      </div>
+    </header>
   );
 }
 

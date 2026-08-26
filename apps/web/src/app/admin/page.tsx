@@ -31,15 +31,29 @@ export default async function AdminOverviewPage() {
     <>
       <AdminPageHeader
         eyebrow="صف‌های عملیاتی"
-        title="نمای کلی"
-        copy="فقط داده‌های ثبت‌شده نمایش داده می‌شوند؛ این صفحه آمار تخمینی یا نمایشی ندارد."
+        title="امروز چه چیزی نیاز به اقدام دارد؟"
+        copy="صف‌های واقعی را از همین‌جا باز کنید؛ هیچ آمار تخمینی یا نمایشی در این صفحه وجود ندارد."
       />
+      <section className="admin-command-bar" aria-label="دسترسی سریع">
+        <div>
+          <span>دسترسی سریع</span>
+          <strong>عملیات روزانه</strong>
+        </div>
+        <Link href="/admin/payments">بررسی پرداخت‌ها</Link>
+        <Link href="/admin/procurement">ادامه تدارکات</Link>
+        <Link href="/admin/orders">همه سفارش‌ها</Link>
+      </section>
       <div className="admin-metrics">
         {metrics.map(([label, value, href]) => {
           const content = (
             <>
               <span>{label}</span>
               <strong>{value}</strong>
+              {href !== null ? (
+                <small>باز کردن صف ←</small>
+              ) : (
+                <small>فقط نمایش</small>
+              )}
             </>
           );
           return href === null ? (

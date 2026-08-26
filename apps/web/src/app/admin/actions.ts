@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { requireAdmin } from "../../server/admin";
 import { database } from "../../server/db";
+import { destroyCurrentSession } from "../../server/auth";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -20,6 +21,12 @@ function destination(
   message: string,
 ): never {
   redirect(`${path}?${type}=${encodeURIComponent(message)}`);
+}
+
+export async function adminLogoutAction(): Promise<void> {
+  await requireAdmin();
+  await destroyCurrentSession();
+  redirect("/account/login");
 }
 
 export async function reviewCardPaymentAction(formData: FormData) {
