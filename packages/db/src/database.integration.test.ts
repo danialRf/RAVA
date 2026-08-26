@@ -11,7 +11,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "./client";
 import {
   addCartItem,
+  assignOrderToTrip,
   capturePayment,
+  createAdminContent,
+  createAdminPricingRule,
+  createAdminTrip,
   completeGatewayDeposit,
   consumeVerificationToken,
   createOrderFromQuote,
@@ -54,12 +58,18 @@ import {
   listStorefrontProductsBySlugs,
   recordOfferObservation,
   recordRateLimitAttempt,
+  receiveOrderInGermany,
   reviewCardPayment,
+  reviewAdminOffer,
   replaceWishlistFromSlugs,
   resolvePricingRule,
   searchPublishedProducts,
   setDefaultAddress,
   transitionOrderStatus,
+  updateAdminContentStatus,
+  updateAdminProduct,
+  updateAdminRetailer,
+  updateAdminTripStatus,
   updateProcurementItem,
   issueVerificationToken,
 } from "./repositories";
@@ -71,6 +81,7 @@ import {
   carts,
   categories,
   coupons,
+  contentEntries,
   paymentReceipts,
   fxRates,
   orderItems,
@@ -80,6 +91,8 @@ import {
   pricingRules,
   productVariants,
   products,
+  trips,
+  tripItems,
   purchaseTasks,
   purchaseDocuments,
   purchases,
@@ -106,6 +119,176 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await handle?.close();
+});
+
+describe("admin phase 6 management", () => {
+  it("audits catalog, offer, pricing, trip, source and content changes", async () => {
+    const fixture = await createCatalogFixture();
+    const [actor] = await db
+      .insert(users)
+      .values({ email: "owner-phase6@example.com", role: "OWNER" })
+      .returning();
+    if (!actor) throw new Error("Admin fixture missing");
+
+    await updateAdminProduct(db, {
+      id: fixture.product.id,
+      actorUserId: actor.id,
+      titleFa: "کفش آدیداس سامبا ویرایش‌شده",
+      descriptionFa: "توضیح بررسی‌شده",
+      status: "NEEDS_REVIEW",
+      weightGrams: 750,
+      transportClass: "M",
+    });
+    const [offer] = await db
+      .insert(sourceOffers)
+      .values({
+        retailerId: fixture.retailer.id,
+        productVariantId: fixture.variant.id,
+        sourceUrl: "https://demo-retailer.example/phase-6",
+        rawTitle: "Adidas Samba",
+        sourcePriceEurCents: 12_000n,
+        stockStatus: "IN_STOCK",
+      })
+      .returning();
+    if (!offer) throw new Error("Offer fixture missing");
+    await reviewAdminOffer(db, {
+      id: offer.id,
+      actorUserId: actor.id,
+      sourceVerified: true,
+    });
+    await createAdminPricingRule(db, {
+      actorUserId: actor.id,
+      priority: 200,
+      targetMarginBps: 1_500,
+      minProfitToman: 500_000n,
+      transportClass: "M",
+      customsRiskBps: 100,
+      fxBufferBps: 200,
+      paymentFeeBps: 100,
+      depositBps: 3_500,
+      minDepositToman: 1_000_000n,
+      roundingUnitToman: 10_000n,
+      notes: "phase 6",
+    });
+    const trip = await createAdminTrip(db, {
+      actorUserId: actor.id,
+      code: "RAVA-P6",
+      title: "سفر آزمایشی فاز شش",
+      capacityWeightGrams: 20_000,
+      departureWindowStart: null,
+      departureWindowEnd: null,
+      arrivalWindowStart: null,
+      arrivalWindowEnd: null,
+      notes: null,
+    });
+    await updateAdminTripStatus(db, {
+      id: trip.id,
+      actorUserId: actor.id,
+      status: "COLLECTING",
+    });
+    await updateAdminRetailer(db, {
+      id: fixture.retailer.id,
+      actorUserId: actor.id,
+      isEnabled: true,
+      trustTier: "AUTHORIZED_RETAILER",
+      defaultIntervalMinutes: 240,
+      termsNotes: "Public catalog only",
+    });
+    const content = await createAdminContent(db, {
+      actorUserId: actor.id,
+      key: "home.phase6",
+      title: "فاز شش",
+      bodyText: "محتوای بررسی‌شده",
+    });
+    await updateAdminContentStatus(db, {
+      id: content.id,
+      actorUserId: actor.id,
+      status: "PUBLISHED",
+    });
+    const [customer] = await db
+      .insert(users)
+      .values({ email: "trip-customer@example.com" })
+      .returning();
+    if (!customer) throw new Error("Customer fixture missing");
+    const [order] = await db
+      .insert(orders)
+      .values({
+        orderNumber: "RAVA-PHASE6-TRIP",
+        userId: customer.id,
+        status: "PURCHASED_GERMANY",
+        totalLockedToman: 10_000_000n,
+        depositRequiredToman: 3_500_000n,
+        depositPaidToman: 3_500_000n,
+        balanceDueToman: 6_500_000n,
+      })
+      .returning();
+    if (!order) throw new Error("Order fixture missing");
+    await db.insert(orderItems).values({
+      orderId: order.id,
+      productVariantId: fixture.variant.id,
+      sourceOfferId: offer.id,
+      productSnapshot: {
+        titleFa: "کفش تست",
+        titleOriginal: "Test Shoe",
+        brand: "Adidas",
+        variant: {},
+      },
+      offerSnapshot: {
+        retailer: fixture.retailer.name,
+        sourceUrl: offer.sourceUrl,
+        priceEurCents: offer.sourcePriceEurCents.toString(),
+        observedAt: new Date().toISOString(),
+      },
+      quantity: 1,
+      unitTotalToman: 10_000_000n,
+      lineTotalToman: 10_000_000n,
+      procurementStatus: "PURCHASED",
+    });
+    await receiveOrderInGermany(db, { id: order.id, actorUserId: actor.id });
+    await assignOrderToTrip(db, {
+      orderId: order.id,
+      tripId: trip.id,
+      actorUserId: actor.id,
+    });
+
+    expect((await db.select().from(products))[0]?.status).toBe("NEEDS_REVIEW");
+    expect((await db.select().from(sourceOffers))[0]?.sourceVerified).toBe(
+      true,
+    );
+    expect(await db.select().from(pricingRules)).toHaveLength(1);
+    expect((await db.select().from(trips))[0]?.status).toBe("COLLECTING");
+    expect((await db.select().from(contentEntries))[0]?.status).toBe(
+      "PUBLISHED",
+    );
+    expect((await db.select().from(orders))[0]?.status).toBe("TRIP_ASSIGNED");
+    expect(await db.select().from(tripItems)).toHaveLength(1);
+    expect(await db.select().from(adminAuditLog)).toHaveLength(10);
+  });
+
+  it("refuses to verify an unmatched offer", async () => {
+    const fixture = await createCatalogFixture();
+    const [actor] = await db
+      .insert(users)
+      .values({ email: "merch-phase6@example.com", role: "MERCHANDISER" })
+      .returning();
+    const [offer] = await db
+      .insert(sourceOffers)
+      .values({
+        retailerId: fixture.retailer.id,
+        sourceUrl: "https://demo-retailer.example/unmatched",
+        rawTitle: "Unknown item",
+        sourcePriceEurCents: 1_000n,
+      })
+      .returning();
+    if (!actor || !offer) throw new Error("Fixture missing");
+    await expect(
+      reviewAdminOffer(db, {
+        id: offer.id,
+        actorUserId: actor.id,
+        sourceVerified: true,
+      }),
+    ).rejects.toMatchObject({ code: "UNMATCHED_OFFER_CANNOT_BE_VERIFIED" });
+  });
 });
 
 beforeEach(async () => {

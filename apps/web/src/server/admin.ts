@@ -2,11 +2,21 @@ import "server-only";
 
 import {
   getAdminOverview,
+  getAdminHealth,
   getAdminOrderDetails,
   listAdminAuditLog,
+  listAdminCatalog,
+  listAdminContent,
+  listAdminCustomers,
+  listAdminOffers,
   listAdminOrders,
+  listAdminPricingRules,
+  listAdminProductRequests,
+  listAdminRetailers,
+  listAdminTrips,
   listPaymentsNeedingReview,
   listProcurementQueue,
+  listOrdersAwaitingTrip,
 } from "@rava/db";
 import {
   hasAdminPermission,
@@ -31,9 +41,19 @@ export async function requireAdmin(
 
 export const adminQueries = {
   overview: () => getAdminOverview(database()),
-  orders: () => listAdminOrders(database()),
+  orders: (customerId?: string) => listAdminOrders(database(), 50, customerId),
   orderDetails: (orderId: string) => getAdminOrderDetails(database(), orderId),
   paymentsNeedingReview: () => listPaymentsNeedingReview(database()),
   procurementQueue: () => listProcurementQueue(database()),
   auditLog: () => listAdminAuditLog(database()),
+  catalog: () => listAdminCatalog(database()),
+  offers: () => listAdminOffers(database()),
+  pricing: () => listAdminPricingRules(database()),
+  trips: () => listAdminTrips(database()),
+  ordersAwaitingTrip: () => listOrdersAwaitingTrip(database()),
+  customers: () => listAdminCustomers(database()),
+  sources: () => listAdminRetailers(database()),
+  content: () => listAdminContent(database()),
+  productRequests: () => listAdminProductRequests(database()),
+  health: () => getAdminHealth(database()),
 };

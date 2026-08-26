@@ -2,14 +2,28 @@ import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 
 import {
   adminAuditLog,
+  brands,
+  categories,
+  contentEntries,
+  fxRates,
+  jobsAudit,
   orderItems,
   orders,
+  outboxEvents,
   paymentReceipts,
   payments,
   productRequests,
+  products,
+  productVariants,
   purchaseDocuments,
   purchases,
   purchaseTasks,
+  pricingRules,
+  retailers,
+  scraperRuns,
+  sourceOffers,
+  tripItems,
+  trips,
   users,
 } from "../schema";
 import type { Executor } from "./executor";
@@ -65,8 +79,203 @@ export async function getAdminOverview(executor: Executor) {
   };
 }
 
-export async function listAdminOrders(executor: Executor, limit = 50) {
+export async function listAdminCatalog(executor: Executor, limit = 100) {
   return executor
+    .select({
+      id: products.id,
+      titleFa: products.titleFa,
+      titleOriginal: products.titleOriginal,
+      descriptionFa: products.descriptionFa,
+      slug: products.slug,
+      status: products.status,
+      weightGrams: products.weightGrams,
+      transportClass: products.transportClass,
+      brandName: brands.name,
+      categoryName: categories.nameFa,
+      variantCount: sql<number>`(select count(*)::int from ${productVariants} where ${productVariants.productId} = ${products.id})`,
+      offerCount: sql<number>`(select count(*)::int from ${sourceOffers} inner join ${productVariants} on ${sourceOffers.productVariantId} = ${productVariants.id} where ${productVariants.productId} = ${products.id})`,
+      updatedAt: products.updatedAt,
+    })
+    .from(products)
+    .innerJoin(brands, eq(brands.id, products.brandId))
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .orderBy(desc(products.updatedAt))
+    .limit(limit);
+}
+
+export async function listAdminOffers(executor: Executor, limit = 100) {
+  return executor
+    .select({
+      id: sourceOffers.id,
+      rawTitle: sourceOffers.rawTitle,
+      sourceUrl: sourceOffers.sourceUrl,
+      sourcePriceEurCents: sourceOffers.sourcePriceEurCents,
+      stockStatus: sourceOffers.stockStatus,
+      sourceVerified: sourceOffers.sourceVerified,
+      retailerName: retailers.name,
+      productTitle: products.titleFa,
+      lastSeenAt: sourceOffers.lastSeenAt,
+    })
+    .from(sourceOffers)
+    .innerJoin(retailers, eq(retailers.id, sourceOffers.retailerId))
+    .leftJoin(
+      productVariants,
+      eq(productVariants.id, sourceOffers.productVariantId),
+    )
+    .leftJoin(products, eq(products.id, productVariants.productId))
+    .orderBy(desc(sourceOffers.lastSeenAt))
+    .limit(limit);
+}
+
+export async function listAdminPricingRules(executor: Executor) {
+  return executor
+    .select({
+      id: pricingRules.id,
+      scope: pricingRules.scope,
+      priority: pricingRules.priority,
+      targetMarginBps: pricingRules.targetMarginBps,
+      minProfitToman: pricingRules.minProfitToman,
+      transportClass: pricingRules.transportClass,
+      customsRiskBps: pricingRules.customsRiskBps,
+      fxBufferBps: pricingRules.fxBufferBps,
+      paymentFeeBps: pricingRules.paymentFeeBps,
+      depositBps: pricingRules.depositBps,
+      minDepositToman: pricingRules.minDepositToman,
+      roundingUnitToman: pricingRules.roundingUnitToman,
+      activeFrom: pricingRules.activeFrom,
+      activeTo: pricingRules.activeTo,
+      notes: pricingRules.notes,
+    })
+    .from(pricingRules)
+    .orderBy(desc(pricingRules.priority), desc(pricingRules.activeFrom));
+}
+
+export async function listAdminTrips(executor: Executor) {
+  return executor
+    .select({
+      id: trips.id,
+      code: trips.code,
+      title: trips.title,
+      status: trips.status,
+      departureWindowStart: trips.departureWindowStart,
+      arrivalWindowEnd: trips.arrivalWindowEnd,
+      capacityWeightGrams: trips.capacityWeightGrams,
+      itemCount: sql<number>`(select count(*)::int from ${tripItems} where ${tripItems.tripId} = ${trips.id})`,
+      assignedWeightGrams: sql<number>`coalesce((select sum(${tripItems.packedWeightGrams})::int from ${tripItems} where ${tripItems.tripId} = ${trips.id}), 0)`,
+    })
+    .from(trips)
+    .orderBy(desc(trips.departureWindowStart), desc(trips.createdAt));
+}
+
+export async function listOrdersAwaitingTrip(executor: Executor) {
+  return executor
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      customerName: users.displayName,
+      itemCount: sql<number>`(select count(*)::int from ${orderItems} where ${orderItems.orderId} = ${orders.id})`,
+    })
+    .from(orders)
+    .innerJoin(users, eq(users.id, orders.userId))
+    .where(eq(orders.status, "TRIP_PENDING"))
+    .orderBy(orders.createdAt);
+}
+
+export async function listAdminCustomers(executor: Executor, limit = 100) {
+  return executor
+    .select({
+      id: users.id,
+      displayName: users.displayName,
+      email: users.email,
+      phoneE164: users.phoneE164,
+      status: users.status,
+      createdAt: users.createdAt,
+      orderCount: sql<number>`count(${orders.id})::int`,
+      totalPaidToman: sql<bigint>`coalesce(sum(${orders.depositPaidToman} + ${orders.balancePaidToman}), 0)`,
+    })
+    .from(users)
+    .leftJoin(orders, eq(orders.userId, users.id))
+    .where(eq(users.role, "CUSTOMER"))
+    .groupBy(users.id)
+    .orderBy(desc(users.createdAt))
+    .limit(limit);
+}
+
+export async function listAdminRetailers(executor: Executor) {
+  return executor
+    .select({
+      id: retailers.id,
+      name: retailers.name,
+      domain: retailers.domain,
+      trustTier: retailers.trustTier,
+      isEnabled: retailers.isEnabled,
+      defaultIntervalMinutes: retailers.defaultIntervalMinutes,
+      termsNotes: retailers.termsNotes,
+      lastHealthStatus: retailers.lastHealthStatus,
+      lastHealthAt: retailers.lastHealthAt,
+      offerCount: sql<number>`(select count(*)::int from ${sourceOffers} where ${sourceOffers.retailerId} = ${retailers.id})`,
+    })
+    .from(retailers)
+    .orderBy(retailers.name);
+}
+
+export async function listAdminContent(executor: Executor) {
+  return executor
+    .select()
+    .from(contentEntries)
+    .orderBy(desc(contentEntries.updatedAt));
+}
+
+export async function listAdminProductRequests(executor: Executor) {
+  return executor
+    .select({
+      id: productRequests.id,
+      descriptionFa: productRequests.descriptionFa,
+      referenceUrl: productRequests.referenceUrl,
+      budgetToman: productRequests.budgetToman,
+      status: productRequests.status,
+      customerName: users.displayName,
+      customerEmail: users.email,
+      createdAt: productRequests.createdAt,
+    })
+    .from(productRequests)
+    .leftJoin(users, eq(users.id, productRequests.userId))
+    .orderBy(desc(productRequests.createdAt));
+}
+
+export async function getAdminHealth(executor: Executor) {
+  const [fx] = await executor
+    .select()
+    .from(fxRates)
+    .orderBy(desc(fxRates.fetchedAt))
+    .limit(1);
+  const [failedJobs] = await executor
+    .select({ value: count() })
+    .from(jobsAudit)
+    .where(eq(jobsAudit.status, "FAILED"));
+  const [pendingOutbox] = await executor
+    .select({ value: count() })
+    .from(outboxEvents)
+    .where(inArray(outboxEvents.status, ["PENDING", "FAILED"]));
+  const [failedScrapers] = await executor
+    .select({ value: count() })
+    .from(scraperRuns)
+    .where(inArray(scraperRuns.status, ["FAILED", "PARTIAL"]));
+  return {
+    latestFx: fx ?? null,
+    failedJobs: failedJobs?.value ?? 0,
+    pendingOutbox: pendingOutbox?.value ?? 0,
+    failedScrapers: failedScrapers?.value ?? 0,
+    retailers: await listAdminRetailers(executor),
+  };
+}
+
+export async function listAdminOrders(
+  executor: Executor,
+  limit = 50,
+  customerId?: string,
+) {
+  const query = executor
     .select({
       id: orders.id,
       orderNumber: orders.orderNumber,
@@ -79,6 +288,8 @@ export async function listAdminOrders(executor: Executor, limit = 50) {
     })
     .from(orders)
     .innerJoin(users, eq(users.id, orders.userId))
+    .$dynamic();
+  return (customerId ? query.where(eq(orders.userId, customerId)) : query)
     .orderBy(desc(orders.createdAt))
     .limit(limit);
 }

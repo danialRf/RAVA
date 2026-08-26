@@ -1951,6 +1951,135 @@ p {
   font-size: 0.68rem;
   font-weight: 700;
 }
+
+.admin-flash,
+.admin-create-panel,
+.admin-record {
+  border: 1px solid var(--admin-border, #dfcdb7);
+  background: #fffaf4;
+}
+
+.admin-flash {
+  margin-block: 1rem;
+  padding: 0.8rem 1rem;
+}
+
+.admin-flash.success {
+  border-color: #8dab86;
+}
+.admin-flash.error {
+  border-color: #c77474;
+}
+
+.admin-create-panel {
+  margin-block: 1.25rem;
+  padding: 1rem;
+}
+
+.admin-create-panel > summary,
+.admin-record > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.admin-form-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: #5d493a;
+  font-size: 0.88rem;
+}
+
+.admin-form-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.admin-form-grid input,
+.admin-form-grid select,
+.admin-form-grid textarea,
+.admin-record select {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #dfcdb7;
+  background: white;
+  color: #211b18;
+}
+
+.admin-form-grid button,
+.admin-record button {
+  min-height: 2.7rem;
+  padding-inline: 1rem;
+  border: 0;
+  background: #743448;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+
+.admin-record button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-record-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1.25rem;
+}
+
+.admin-record {
+  padding: 1rem;
+}
+.admin-record > summary,
+.admin-record.static {
+  display: grid;
+  grid-template-columns: minmax(14rem, 2fr) repeat(3, minmax(7rem, 1fr));
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-record.static form {
+  display: flex;
+  gap: 0.5rem;
+}
+.admin-record strong,
+.admin-record small {
+  display: block;
+}
+.admin-record small {
+  color: #796b62;
+  margin-top: 0.25rem;
+}
+.admin-record mark {
+  width: fit-content;
+  padding: 0.3rem 0.5rem;
+  background: #f4dfb0;
+  color: #5b351c;
+}
+
+@media (max-width: 760px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-form-grid .wide {
+    grid-column: auto;
+  }
+  .admin-record > summary,
+  .admin-record.static {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .admin-record.static form {
+    flex-direction: column;
+  }
+}
 @media (min-width: 64rem) {
   .admin-shell {
     grid-template-columns: 15rem minmax(0, 1fr);

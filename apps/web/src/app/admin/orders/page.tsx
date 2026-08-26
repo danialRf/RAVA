@@ -5,9 +5,14 @@ import { formatDate, formatToman } from "../../../lib/format";
 import { orderStatusFa } from "../../../lib/order-status";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 
-export default async function AdminOrdersPage() {
+export default async function AdminOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customer?: string }>;
+}) {
   await requireAdmin("ORDERS_READ");
-  const orders = await adminQueries.orders();
+  const { customer } = await searchParams;
+  const orders = await adminQueries.orders(customer);
   return (
     <>
       <AdminPageHeader

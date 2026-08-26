@@ -11,6 +11,8 @@ describe("admin RBAC", () => {
   it("grants owners and admins the complete operating surface", () => {
     expect(hasAdminPermission("OWNER", "PRICING_WRITE")).toBe(true);
     expect(hasAdminPermission("ADMIN", "PAYMENTS_REVIEW")).toBe(true);
+    expect(hasAdminPermission("OWNER", "TRIPS_WRITE")).toBe(true);
+    expect(hasAdminPermission("ADMIN", "SOURCES_WRITE")).toBe(true);
   });
 
   it("keeps specialist roles least-privileged", () => {
@@ -18,5 +20,8 @@ describe("admin RBAC", () => {
     expect(hasAdminPermission("BUYER_GERMANY", "PRICING_WRITE")).toBe(false);
     expect(hasAdminPermission("FINANCE", "PAYMENTS_REVIEW")).toBe(true);
     expect(hasAdminPermission("CONTENT_EDITOR", "PAYMENTS_READ")).toBe(false);
+    expect(hasAdminPermission("SUPPORT", "REQUESTS_WRITE")).toBe(true);
+    expect(hasAdminPermission("SUPPORT", "PRICING_WRITE")).toBe(false);
+    expect(hasAdminPermission("BUYER_GERMANY", "TRIPS_WRITE")).toBe(true);
   });
 });

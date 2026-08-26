@@ -14,7 +14,7 @@ Codex must update this file after every phase.
 
 ## Current phase
 
-`PHASE_6_ADMIN_OPERATIONS_IN_PROGRESS`
+`PHASE_7_POST_PURCHASE_LIFECYCLE_READY`
 
 ## Completed
 
@@ -27,6 +27,7 @@ Codex must update this file after every phase.
 - Beauty-editorial storefront art direction and Vazirmatn/B-Vazir typography refinement — 2026-08-18.
 
 - Phase 6 admin foundation, RBAC, audited payment/procurement actions and dedicated operations workspace — 2026-08-26.
+- Phase 6 complete admin operating system: catalog, offers, pricing, trips, customers, requests, sources, content, health, procurement evidence and audit — 2026-08-26.
 
 ## Delivered foundations
 
@@ -77,11 +78,14 @@ Codex must update this file after every phase.
 ## Current architecture decisions
 
 - Next.js App Router web app plus a separate worker inside the TypeScript monorepo; no premature microservices.
-- Phase 6 has started with centralized least-privilege RBAC and a server-protected admin route. The first operational read models cover overview totals, orders, payment review, procurement and the append-only audit log; every value comes from persisted rows.
+- Phase 6 is complete with centralized least-privilege RBAC and server-protected admin routes. Operational read/write models cover overview totals, orders, payment review, procurement, catalog, source offers, pricing rules, trips, customers, product requests, retailers, content, system health and the append-only audit log; every value comes from persisted rows.
 - Card-to-card review is now a finance-only, reason-required transaction: approval validates the locked deposit, credits the order, creates idempotent buyer tasks, advances history, emits the outbox event and writes audit; rejection credits nothing and records its reason. Receipt bytes remain private and are streamed only through an authenticated, no-store staff route.
 - Buyer actions (`assign to self`, `start`, `mark unavailable`, `complete purchase`) follow the domain state machines and write an audit event in the same transaction. Completing a purchase records integer EUR cents, the approved source/seller, a masked retailer reference and a private receipt; it then advances the immutable order item and, once every item is bought, the order itself. An unavailable item moves the order to customer reconfirmation instead of leaving the two views inconsistent. Gateway deposits and approved card receipts share one idempotent procurement-task factory so their queues cannot drift.
 - Admin orders now have a dedicated immutable detail view containing the customer, locked financial snapshot, item-level procurement state and private purchase evidence. The customer order detail exposes the same item-level progress without exposing staff-only costs or documents.
 - Procurement rows are created automatically from paid, locked orders. There is intentionally no free-form “add” button because that would bypass ownership, pricing and payment controls; a future manual-order/adjustment workflow must be separately permissioned and audited.
+- Catalog publication, offer source verification, pricing-rule creation, retailer policy, trip operations, request handling and content publication are server-validated, role-scoped and audited. An unmatched offer cannot be marked verified.
+- Orders purchased in Germany can be received into the Germany hub and moved into the trip queue in one audited transaction. Trip assignment writes item links, order history and an outbox event; only planned/collecting trips and `TRIP_PENDING` orders are eligible.
+- The pricing editor exposes every persisted pricing factor while keeping the provider-owned live FX rate read-only. Money remains integer Toman/EUR cents and basis points.
 - Staff roles are `OWNER`, `ADMIN`, `MERCHANDISER`, `BUYER_GERMANY`, `SUPPORT`, `FINANCE` and `CONTENT_EDITOR`. The legacy `OPERATOR` value remains read-only for migration compatibility and should be reassigned explicitly.
 - The persistent storefront header owns a semantic inline search form; `/search` receives the query and renders results rather than acting as an intermediate query-entry step.
 - Request-scoped composition stays in `apps/web/src/server`; pure policy stays in `@rava/domain`; persistence stays in `@rava/db`.
@@ -127,6 +131,14 @@ Codex must update this file after every phase.
 
 ## Latest verification (2026-08-26)
 
+Passed after completing Phase 6 admin operations:
+
+- `pnpm format`, `pnpm lint` and workspace-wide `pnpm typecheck`.
+- `pnpm test` — 14 files and 163 tests passed, including all audited Phase 6 mutations and Germany-trip assignment.
+- Production Next.js build — all 49 application routes compiled successfully, including nine new admin modules.
+- `pnpm test:e2e` — all 23 tests passed, including authenticated OWNER access to every Phase 6 module at 390 px without horizontal overflow.
+- Mobile admin capture: `docs/phase-6-admin-trips-390x844.png`.
+
 Passed after the Phase 6 procurement-completion slice:
 
 - `pnpm format`, `pnpm lint` and workspace-wide `pnpm typecheck`.
@@ -161,4 +173,4 @@ CI uses the deterministic private-storage adapter because its service matrix doe
 
 ## Next phase
 
-Continue Phase 6 with catalog/pricing editors, trips, customers, sources, content and health screens. Pricing settings must expose every pricing factor except the provider-owned live FX rate. Then complete the post-purchase lifecycle: customer reconfirmation, balance settlement, Germany dispatch, Iran arrival, local delivery and returns.
+Begin Phase 7: complete customer reconfirmation choices, balance collection, Germany dispatch, Iran arrival, local delivery, cancellation/refund handling and customer notifications. Production provider credentials and rights-cleared product photography remain external launch dependencies.

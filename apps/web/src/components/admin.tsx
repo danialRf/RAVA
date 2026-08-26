@@ -9,6 +9,15 @@ const NAVIGATION = [
   ["سفارش‌ها", "/admin/orders", "ORDERS_READ", "orders"],
   ["تدارکات و خرید", "/admin/procurement", "PROCUREMENT_READ", "truck"],
   ["بررسی پرداخت‌ها", "/admin/payments", "PAYMENTS_READ", "payment"],
+  ["کاتالوگ", "/admin/catalog", "CATALOG_READ", "orders"],
+  ["پیشنهادها", "/admin/offers", "CATALOG_READ", "orders"],
+  ["قیمت‌گذاری", "/admin/pricing", "PRICING_READ", "payment"],
+  ["سفرها", "/admin/trips", "TRIPS_READ", "truck"],
+  ["مشتریان", "/admin/customers", "CUSTOMERS_READ", "home"],
+  ["درخواست‌ها", "/admin/requests", "REQUESTS_READ", "orders"],
+  ["منابع خرید", "/admin/sources", "SOURCES_READ", "truck"],
+  ["محتوا", "/admin/content", "CONTENT_READ", "orders"],
+  ["سلامت سیستم", "/admin/health", "HEALTH_READ", "history"],
   ["تاریخچه ممیزی", "/admin/audit", "AUDIT_READ", "history"],
 ] as const;
 
@@ -26,10 +35,6 @@ export function AdminNavigation({ user }: { user: SessionPrincipal }) {
         </Link>
       </div>
       <AdminNavLinks items={items} />
-      <div className="admin-next-modules">
-        <span>در صف توسعه</span>
-        <small>کاتالوگ، قیمت‌گذاری، سفرها، مشتریان و منابع خرید</small>
-      </div>
       <div className="admin-identity">
         <span>{user.displayName ?? user.email ?? "همکار روا"}</span>
         <small dir="ltr">{user.role}</small>

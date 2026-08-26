@@ -9,12 +9,17 @@ import {
   procurementStatusFa,
 } from "../../../../lib/order-status";
 import { adminQueries, requireAdmin } from "../../../../server/admin";
+import { receiveOrderInGermanyAction } from "../../actions";
 
 export default async function AdminOrderDetailsPage({
   params,
-}: PageProps<"/admin/orders/[id]">) {
+  searchParams,
+}: PageProps<"/admin/orders/[id]"> & {
+  searchParams: Promise<{ notice?: string; error?: string }>;
+}) {
   await requireAdmin("ORDERS_READ");
   const { id } = await params;
+  const query = await searchParams;
   const result = await adminQueries.orderDetails(id);
   if (result === null) notFound();
 
@@ -30,6 +35,21 @@ export default async function AdminOrderDetailsPage({
         <span>{orderStatusFa(result.order.status)}</span>
         <small>{formatDate(result.order.createdAt)}</small>
       </div>
+      {query.notice && <p className="admin-flash success">{query.notice}</p>}
+      {query.error && <p className="admin-flash error">{query.error}</p>}
+      {result.order.status === "PURCHASED_GERMANY" && (
+        <form
+          action={receiveOrderInGermanyAction}
+          className="admin-command-bar"
+        >
+          <input type="hidden" name="id" value={result.order.id} />
+          <div>
+            <span>مرکز آلمان</span>
+            <strong>همه اقلام فیزیکی دریافت شده‌اند؟</strong>
+          </div>
+          <button type="submit">ثبت دریافت و ورود به صف سفر</button>
+        </form>
+      )}
       <div className="admin-order-detail">
         <section>
           <h2>اقلام قفل‌شده سفارش</h2>
