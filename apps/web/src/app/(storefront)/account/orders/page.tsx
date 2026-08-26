@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AccountNav } from "../../../../components/account";
 import { PageIntro } from "../../../../components/storefront";
 import { formatToman } from "../../../../lib/format";
+import { orderStatusFa } from "../../../../lib/order-status";
 import { currentUser } from "../../../../server/auth";
 import { accountQueries } from "../../../../server/account";
 
@@ -11,16 +12,6 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "سفارش‌های من",
   robots: { index: false, follow: false },
-};
-
-const statusLabels: Record<string, string> = {
-  DEPOSIT_PENDING: "در انتظار پیش‌پرداخت",
-  PROCUREMENT_PENDING: "در صف تهیه از آلمان",
-  PURCHASED: "خریداری‌شده",
-  IN_TRANSIT_TO_IRAN: "در مسیر ایران",
-  READY_FOR_LOCAL_DELIVERY: "آماده تحویل",
-  DELIVERED: "تحویل‌شده",
-  CANCELLED: "لغوشده",
 };
 
 export default async function OrdersPage() {
@@ -50,7 +41,7 @@ export default async function OrdersPage() {
             <Link key={order.id} href={`/account/orders/${order.id}`}>
               <div>
                 <strong dir="ltr">{order.orderNumber}</strong>
-                <span>{statusLabels[order.status] ?? "در حال بررسی"}</span>
+                <span>{orderStatusFa(order.status)}</span>
               </div>
               <div>
                 <strong>{formatToman(order.totalLockedToman)} تومان</strong>

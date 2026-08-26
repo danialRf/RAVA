@@ -1851,6 +1851,106 @@ p {
   display: grid;
   gap: 0.6rem;
 }
+.admin-queue-note {
+  margin: -0.5rem 0 1rem;
+  padding: 0.7rem 0.8rem;
+  border-inline-start: 3px solid var(--rava-gold);
+  color: var(--rava-muted-ink);
+  background: var(--rava-gold-pale);
+  font-size: 0.72rem;
+}
+.procurement-actions .purchase-completion {
+  border-color: color-mix(in srgb, var(--rava-success) 45%, var(--rava-border));
+  background: color-mix(in srgb, var(--rava-sage-soft) 55%, white);
+}
+.procurement-actions .purchase-completion summary {
+  color: var(--rava-success);
+  font-weight: 800;
+}
+.purchase-completion p {
+  margin: 0;
+  color: var(--rava-muted-ink);
+  font-size: 0.68rem;
+}
+.admin-money-fields {
+  display: grid;
+  gap: 0.6rem;
+}
+.admin-order-toolbar {
+  margin-bottom: 1rem;
+  padding: 0.7rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom: 1px solid var(--rava-border);
+}
+.admin-order-toolbar a {
+  margin-inline-end: auto;
+  color: var(--rava-burgundy);
+}
+.admin-order-toolbar span {
+  padding: 0.2rem 0.5rem;
+  background: var(--rava-sage-soft);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.admin-order-toolbar small {
+  color: var(--rava-muted-ink);
+}
+.admin-order-detail {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+.admin-order-detail > section {
+  padding: 1rem;
+  border: 1px solid var(--rava-border);
+  background: white;
+}
+.admin-order-detail > section > h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.admin-order-detail > section > p {
+  color: var(--rava-muted-ink);
+  font-size: 0.7rem;
+}
+.admin-order-detail article {
+  padding-block: 1rem;
+  display: grid;
+  gap: 0.65rem;
+  border-top: 1px solid var(--rava-border);
+}
+.admin-order-detail article > div:first-child {
+  display: grid;
+}
+.admin-order-detail article small {
+  color: var(--rava-muted-ink);
+}
+.admin-order-detail dl {
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.admin-order-detail dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.admin-order-detail dd {
+  margin: 0;
+  font-weight: 700;
+}
+.order-item-progress {
+  width: fit-content;
+  margin-top: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  color: var(--rava-burgundy-dark);
+  background: var(--rava-gold-pale);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
 @media (min-width: 64rem) {
   .admin-shell {
     grid-template-columns: 15rem minmax(0, 1fr);
@@ -1875,6 +1975,12 @@ p {
   }
   .procurement-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-money-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-order-detail {
+    grid-template-columns: minmax(0, 1fr) 22rem;
   }
 }
 

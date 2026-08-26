@@ -79,7 +79,9 @@ Codex must update this file after every phase.
 - Next.js App Router web app plus a separate worker inside the TypeScript monorepo; no premature microservices.
 - Phase 6 has started with centralized least-privilege RBAC and a server-protected admin route. The first operational read models cover overview totals, orders, payment review, procurement and the append-only audit log; every value comes from persisted rows.
 - Card-to-card review is now a finance-only, reason-required transaction: approval validates the locked deposit, credits the order, creates idempotent buyer tasks, advances history, emits the outbox event and writes audit; rejection credits nothing and records its reason. Receipt bytes remain private and are streamed only through an authenticated, no-store staff route.
-- Buyer actions (`assign to self`, `start`, `mark unavailable`) follow the domain state machines and write an audit event in the same transaction. Gateway deposits and approved card receipts share one idempotent procurement-task factory so their queues cannot drift.
+- Buyer actions (`assign to self`, `start`, `mark unavailable`, `complete purchase`) follow the domain state machines and write an audit event in the same transaction. Completing a purchase records integer EUR cents, the approved source/seller, a masked retailer reference and a private receipt; it then advances the immutable order item and, once every item is bought, the order itself. An unavailable item moves the order to customer reconfirmation instead of leaving the two views inconsistent. Gateway deposits and approved card receipts share one idempotent procurement-task factory so their queues cannot drift.
+- Admin orders now have a dedicated immutable detail view containing the customer, locked financial snapshot, item-level procurement state and private purchase evidence. The customer order detail exposes the same item-level progress without exposing staff-only costs or documents.
+- Procurement rows are created automatically from paid, locked orders. There is intentionally no free-form “add” button because that would bypass ownership, pricing and payment controls; a future manual-order/adjustment workflow must be separately permissioned and audited.
 - Staff roles are `OWNER`, `ADMIN`, `MERCHANDISER`, `BUYER_GERMANY`, `SUPPORT`, `FINANCE` and `CONTENT_EDITOR`. The legacy `OPERATOR` value remains read-only for migration compatibility and should be reassigned explicitly.
 - The persistent storefront header owns a semantic inline search form; `/search` receives the query and renders results rather than acting as an intermediate query-entry step.
 - Request-scoped composition stays in `apps/web/src/server`; pure policy stays in `@rava/domain`; persistence stays in `@rava/db`.
@@ -111,7 +113,7 @@ Codex must update this file after every phase.
 
 ## Known limitations
 
-- Only the deposit is collected. Balance settlement, refunds and the remaining order lifecycle beyond `PROCUREMENT_PENDING` are later phases.
+- Only the deposit is collected. Procurement purchase completion is implemented, but balance settlement, customer reconfirmation decisions, refunds, Germany dispatch, Iran arrival, local delivery and returns are later lifecycle slices.
 - Card-to-card receipts remain `PENDING_VERIFICATION` until an authorized finance user approves or rejects them in the admin payment queue.
 - The gateway is `FakePaymentGateway` behind the `PaymentGateway` interface, including a local approval screen that stands in for the bank. No production gateway is wired.
 - Authenticity remains a presentation shell.
@@ -124,6 +126,13 @@ Codex must update this file after every phase.
 - `pnpm test` requires the local PostgreSQL infrastructure; `pnpm test:unit` does not.
 
 ## Latest verification (2026-08-26)
+
+Passed after the Phase 6 procurement-completion slice:
+
+- `pnpm format`, `pnpm lint` and workspace-wide `pnpm typecheck`.
+- `pnpm test` — 14 files and 161 tests passed, including transactional purchase completion, private evidence and unavailable-item customer reconfirmation.
+- Production Next.js build — all 40 application routes compiled successfully, including admin order details and private purchase documents.
+- `pnpm test:e2e` — all 22 storefront, account, checkout, RBAC and responsive tests passed.
 
 Passed after the admin workspace/layout separation:
 
@@ -152,4 +161,4 @@ CI uses the deterministic private-storage adapter because its service matrix doe
 
 ## Next phase
 
-Continue Phase 6 — add purchase completion with actual EUR cost/private receipt, then catalog/pricing editors, trips, customers, sources, content and health screens. Pricing settings must expose every pricing factor except the provider-owned live FX rate.
+Continue Phase 6 with catalog/pricing editors, trips, customers, sources, content and health screens. Pricing settings must expose every pricing factor except the provider-owned live FX rate. Then complete the post-purchase lifecycle: customer reconfirmation, balance settlement, Germany dispatch, Iran arrival, local delivery and returns.

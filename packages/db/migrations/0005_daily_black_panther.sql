@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "purchases_task_unique" ON "purchases" USING btree ("purchase_task_id") WHERE "purchases"."purchase_task_id" is not null;

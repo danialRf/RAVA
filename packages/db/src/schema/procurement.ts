@@ -98,6 +98,9 @@ export const purchases = pgTable(
   },
   (table) => [
     index("purchases_order_item_idx").on(table.orderItemId),
+    uniqueIndex("purchases_task_unique")
+      .on(table.purchaseTaskId)
+      .where(sql`${table.purchaseTaskId} is not null`),
     index("purchases_retailer_time_idx").on(
       table.retailerId,
       table.purchasedAt,

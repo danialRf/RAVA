@@ -7,6 +7,8 @@ import {
   paymentReceipts,
   payments,
   productRequests,
+  purchaseDocuments,
+  purchases,
   purchaseTasks,
   users,
 } from "../schema";
@@ -79,6 +81,69 @@ export async function listAdminOrders(executor: Executor, limit = 50) {
     .innerJoin(users, eq(users.id, orders.userId))
     .orderBy(desc(orders.createdAt))
     .limit(limit);
+}
+
+export async function getAdminOrderDetails(
+  executor: Executor,
+  orderId: string,
+) {
+  const [order] = await executor
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      status: orders.status,
+      totalLockedToman: orders.totalLockedToman,
+      depositPaidToman: orders.depositPaidToman,
+      balanceDueToman: orders.balanceDueToman,
+      balancePaidToman: orders.balancePaidToman,
+      customerName: users.displayName,
+      customerEmail: users.email,
+      createdAt: orders.createdAt,
+    })
+    .from(orders)
+    .innerJoin(users, eq(users.id, orders.userId))
+    .where(eq(orders.id, orderId))
+    .limit(1);
+  if (order === undefined) return null;
+  const items = await executor
+    .select({
+      id: orderItems.id,
+      productSnapshot: orderItems.productSnapshot,
+      offerSnapshot: orderItems.offerSnapshot,
+      quantity: orderItems.quantity,
+      lineTotalToman: orderItems.lineTotalToman,
+      procurementStatus: orderItems.procurementStatus,
+      purchaseEurCents: purchases.purchaseEurCents,
+      shippingEurCents: purchases.shippingEurCents,
+      retailerOrderRefMasked: purchases.retailerOrderRefMasked,
+      purchasedAt: purchases.purchasedAt,
+      receiptDocumentId: sql<
+        string | null
+      >`(select ${purchaseDocuments.id} from ${purchaseDocuments} where ${purchaseDocuments.purchaseId} = ${purchases.id} order by ${purchaseDocuments.createdAt} desc limit 1)`.as(
+        "receipt_document_id",
+      ),
+    })
+    .from(orderItems)
+    .leftJoin(purchases, eq(purchases.orderItemId, orderItems.id))
+    .where(eq(orderItems.orderId, order.id))
+    .orderBy(orderItems.createdAt);
+  return { order, items };
+}
+
+export async function getPurchaseDocumentForAdmin(
+  executor: Executor,
+  documentId: string,
+) {
+  const [document] = await executor
+    .select({
+      id: purchaseDocuments.id,
+      storageKey: purchaseDocuments.storageKey,
+      contentType: purchaseDocuments.contentType,
+    })
+    .from(purchaseDocuments)
+    .where(eq(purchaseDocuments.id, documentId))
+    .limit(1);
+  return document ?? null;
 }
 
 export async function listPaymentsNeedingReview(

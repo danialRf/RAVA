@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
 import { formatDate, formatToman } from "../../../lib/format";
+import { orderStatusFa } from "../../../lib/order-status";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 
 export default async function AdminOrdersPage() {
@@ -19,7 +22,9 @@ export default async function AdminOrdersPage() {
           {orders.map((order) => (
             <article key={order.id}>
               <div>
-                <strong dir="ltr">{order.orderNumber}</strong>
+                <Link href={`/admin/orders/${order.id}`} dir="ltr">
+                  <strong>{order.orderNumber}</strong>
+                </Link>
                 <span>
                   {order.customerName ??
                     order.customerEmail ??
@@ -27,8 +32,8 @@ export default async function AdminOrdersPage() {
                 </span>
               </div>
               <div>
-                <span className="admin-status" dir="ltr">
-                  {order.status}
+                <span className="admin-status">
+                  {orderStatusFa(order.status)}
                 </span>
                 <small>{formatDate(order.createdAt)}</small>
               </div>

@@ -81,6 +81,8 @@ import {
   productVariants,
   products,
   purchaseTasks,
+  purchaseDocuments,
+  purchases,
   quotes,
   retailers,
   reviews,
@@ -1724,9 +1726,92 @@ describe("checkout repository", () => {
     });
     const [updatedTask] = await db.select().from(purchaseTasks);
     const [updatedItem] = await db.select().from(orderItems);
+    const [updatedOrder] = await db.select().from(orders);
     expect(updatedTask?.status).toBe("BLOCKED");
     expect(updatedItem?.procurementStatus).toBe("UNAVAILABLE");
+    expect(updatedOrder?.status).toBe("CUSTOMER_RECONFIRMATION_REQUIRED");
     expect(await db.select().from(adminAuditLog)).toHaveLength(4);
+  });
+
+  it("completes a purchase with actual cost and evidence, then updates the customer order", async () => {
+    const fixture = await createCheckoutFixture();
+    const quote = await persistTestQuote(fixture);
+    const order = await createOrderFromQuote(db, {
+      quoteId: quote.id,
+      userId: fixture.user.id,
+      addressId: fixture.address.id,
+    });
+    const payment = await createPaymentIntent(db, {
+      orderId: order.id,
+      method: "CARD_TO_CARD",
+      provider: "manual",
+      amountToman: order.depositRequiredToman,
+      idempotencyKey: `review:${order.id}:purchase`,
+    });
+    await submitPaymentReceipt(db, {
+      paymentId: payment.id,
+      userId: fixture.user.id,
+      storageKey: "payment-receipts/test/purchase.jpg",
+      contentType: "image/jpeg",
+      byteSize: 2_048,
+    });
+    const [buyer] = await db
+      .insert(users)
+      .values({ email: "buyer@example.com", role: "OWNER" })
+      .returning();
+    if (!buyer) throw new Error("Buyer fixture missing");
+    await reviewCardPayment(db, {
+      paymentId: payment.id,
+      actorUserId: buyer.id,
+      decision: "APPROVE",
+      reason: "مبلغ و رسید تأیید شد",
+    });
+    const [task] = await db.select().from(purchaseTasks);
+    if (!task) throw new Error("Purchase task fixture missing");
+    await updateProcurementItem(db, {
+      orderItemId: task.orderItemId,
+      actorUserId: buyer.id,
+      action: "ASSIGN_TO_SELF",
+    });
+    await updateProcurementItem(db, {
+      orderItemId: task.orderItemId,
+      actorUserId: buyer.id,
+      action: "START",
+    });
+    await updateProcurementItem(db, {
+      orderItemId: task.orderItemId,
+      actorUserId: buyer.id,
+      action: "COMPLETE_PURCHASE",
+      purchase: {
+        purchaseEurCents: 10_500n,
+        shippingEurCents: 499n,
+        retailerOrderRef: "DE-ORDER-12345678",
+        document: {
+          storageKey: "purchase-receipts/test/receipt.jpg",
+          contentType: "image/jpeg",
+          byteSize: 4_096,
+        },
+      },
+    });
+
+    const [storedTask] = await db.select().from(purchaseTasks);
+    const [storedItem] = await db.select().from(orderItems);
+    const [storedOrder] = await db.select().from(orders);
+    const [storedPurchase] = await db.select().from(purchases);
+    const [storedDocument] = await db.select().from(purchaseDocuments);
+    const history = await listOrderStatusHistory(db, order.id);
+    expect(storedTask?.status).toBe("COMPLETED");
+    expect(storedItem?.procurementStatus).toBe("PURCHASED");
+    expect(storedOrder?.status).toBe("PURCHASED_GERMANY");
+    expect(storedPurchase?.purchaseEurCents).toBe(10_500n);
+    expect(storedPurchase?.retailerOrderRefMasked).toMatch(/5678$/);
+    expect(storedDocument?.storageKey).toContain("purchase-receipts/");
+    expect(history.map(({ toStatus }) => toStatus)).toContain(
+      "PROCUREMENT_IN_PROGRESS",
+    );
+    expect(history.map(({ toStatus }) => toStatus)).toContain(
+      "PURCHASED_GERMANY",
+    );
   });
 
   it("rejects a card receipt with a reason without crediting the order", async () => {

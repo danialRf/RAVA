@@ -1,4 +1,5 @@
 import { formatEurCents, hasAdminPermission } from "@rava/domain";
+import Link from "next/link";
 
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
 import { formatDate } from "../../../lib/format";
@@ -21,8 +22,12 @@ export default async function AdminProcurementPage({
       <AdminPageHeader
         eyebrow="خرید آلمان"
         title="صف تدارکات"
-        copy="برای استفاده خریدار در موبایل: کالا، منبع و سقف مجاز خرید در یک نگاه."
+        copy="هر ردیف از یک سفارش پرداخت‌شده ساخته شده است؛ مبلغ واقعی و رسید خرید، وضعیت مشتری را به‌روزرسانی می‌کند."
       />
+      <p className="admin-queue-note">
+        قلم جدید از این صفحه اضافه نمی‌شود؛ صف فقط از سفارش قطعی و دارای
+        پیش‌پرداخت ساخته می‌شود تا کالای بدون سفارش وارد عملیات نشود.
+      </p>
       {params.notice && (
         <p className="admin-feedback success">{String(params.notice)}</p>
       )}
@@ -48,7 +53,11 @@ export default async function AdminProcurementPage({
               <dl>
                 <div>
                   <dt>سفارش</dt>
-                  <dd dir="ltr">{item.orderNumber}</dd>
+                  <dd>
+                    <Link href={`/admin/orders/${item.orderId}`} dir="ltr">
+                      {item.orderNumber}
+                    </Link>
+                  </dd>
                 </div>
                 <div>
                   <dt>تعداد</dt>
@@ -116,6 +125,56 @@ export default async function AdminProcurementPage({
                             value="MARK_UNAVAILABLE"
                           >
                             ثبت عدم موجودی
+                          </button>
+                        </details>
+                      )}
+                    {item.taskStatus === "IN_PROGRESS" &&
+                      item.assignedToUserId === user.id && (
+                        <details className="purchase-completion">
+                          <summary>خرید انجام شد</summary>
+                          <p>
+                            مبلغ واقعی کالا و تصویر رسید را ثبت کنید. مبلغ کالا
+                            نباید از سقف قفل‌شده بیشتر باشد.
+                          </p>
+                          <div className="admin-money-fields">
+                            <label>
+                              مبلغ واقعی کالا (یورو)
+                              <input
+                                name="purchaseEur"
+                                inputMode="decimal"
+                                placeholder="مثلاً 24.95"
+                                required
+                              />
+                            </label>
+                            <label>
+                              هزینه ارسال داخل آلمان (یورو)
+                              <input
+                                name="shippingEur"
+                                inputMode="decimal"
+                                defaultValue="0"
+                                required
+                              />
+                            </label>
+                          </div>
+                          <label>
+                            شماره سفارش فروشگاه (اختیاری)
+                            <input name="retailerOrderRef" maxLength={120} />
+                          </label>
+                          <label>
+                            تصویر رسید خرید
+                            <input
+                              name="receipt"
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              required
+                            />
+                          </label>
+                          <button
+                            className="button primary"
+                            name="action"
+                            value="COMPLETE_PURCHASE"
+                          >
+                            ثبت خرید و اطلاع به مشتری
                           </button>
                         </details>
                       )}

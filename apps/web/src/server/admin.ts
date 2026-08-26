@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   getAdminOverview,
+  getAdminOrderDetails,
   listAdminAuditLog,
   listAdminOrders,
   listPaymentsNeedingReview,
@@ -31,6 +32,7 @@ export async function requireAdmin(
 export const adminQueries = {
   overview: () => getAdminOverview(database()),
   orders: () => listAdminOrders(database()),
+  orderDetails: (orderId: string) => getAdminOrderDetails(database(), orderId),
   paymentsNeedingReview: () => listPaymentsNeedingReview(database()),
   procurementQueue: () => listProcurementQueue(database()),
   auditLog: () => listAdminAuditLog(database()),

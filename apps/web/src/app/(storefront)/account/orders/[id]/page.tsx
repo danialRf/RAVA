@@ -4,18 +4,16 @@ import { notFound, redirect } from "next/navigation";
 import { AccountNav } from "../../../../../components/account";
 import { PageIntro } from "../../../../../components/storefront";
 import { formatToman } from "../../../../../lib/format";
+import {
+  orderStatusFa,
+  procurementStatusFa,
+} from "../../../../../lib/order-status";
 import { currentUser } from "../../../../../server/auth";
 import { readOwnedOrder } from "../../../../../server/checkout";
 
 export const metadata = {
   title: "جزئیات سفارش",
   robots: { index: false, follow: false },
-};
-
-const statusLabels: Record<string, string> = {
-  DEPOSIT_PENDING: "در انتظار پیش‌پرداخت",
-  PROCUREMENT_PENDING: "پیش‌پرداخت تأیید شد؛ در صف تهیه",
-  DEPOSIT_PAID: "پیش‌پرداخت تأیید شد",
 };
 
 export default async function OrderPage({
@@ -49,7 +47,7 @@ export default async function OrderPage({
       <PageIntro
         eyebrow="سفارش من"
         title={result.order.orderNumber}
-        copy={statusLabels[result.order.status] ?? "سفارش ثبت شده است."}
+        copy={orderStatusFa(result.order.status)}
       />
       <AccountNav />
       {query.notice === "paid" && (
@@ -75,6 +73,9 @@ export default async function OrderPage({
                 <span>
                   {item.productSnapshot.brand} ·{" "}
                   {item.productSnapshot.variant.label}
+                </span>
+                <span className="order-item-progress">
+                  {procurementStatusFa(item.procurementStatus)}
                 </span>
               </div>
               <strong>{formatToman(item.lineTotalToman)} تومان</strong>
