@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 
 import { createDatabase, users } from "../../packages/db/src";
 import { hashPassword } from "../../packages/integrations/src";
@@ -463,39 +464,48 @@ test("runs the complete Phase 6 admin workspace on mobile", async ({ page }) => 
     await handle.close();
   }
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/account/login?next=%2Fadmin");
-  await page.locator('input[name="email"]').fill(email);
-  await page.locator('input[name="password"]').fill(password);
-  await page.locator("form.auth-form button").click();
-  await expect(page).toHaveURL(/\/admin$/);
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/account/login?next=%2Fadmin");
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="password"]').fill(password);
+    await page.locator("form.auth-form button").click();
+    await expect(page).toHaveURL(/\/admin$/);
 
-  for (const route of [
-    "/admin/catalog",
-    "/admin/offers",
-    "/admin/pricing",
-    "/admin/trips",
-    "/admin/customers",
-    "/admin/requests",
-    "/admin/sources",
-    "/admin/content",
-    "/admin/health",
-  ]) {
-    await page.goto(route);
-    await expect(page.locator(".admin-page-header h1")).toBeVisible();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-      ),
-      `${route} should not overflow horizontally`,
-    ).toBe(true);
+    for (const route of [
+      "/admin/catalog",
+      "/admin/offers",
+      "/admin/pricing",
+      "/admin/trips",
+      "/admin/customers",
+      "/admin/requests",
+      "/admin/sources",
+      "/admin/content",
+      "/admin/health",
+    ]) {
+      await page.goto(route);
+      await expect(page.locator(".admin-page-header h1")).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+        `${route} should not overflow horizontally`,
+      ).toBe(true);
+    }
+
+    await page.goto("/admin/trips");
+    await page.screenshot({
+      path: "docs/phase-6-admin-trips-390x844.png",
+      fullPage: true,
+    });
+  } finally {
+    const cleanup = createDatabase();
+    try {
+      await cleanup.db.delete(users).where(eq(users.email, email));
+    } finally {
+      await cleanup.close();
+    }
   }
-
-  await page.goto("/admin/trips");
-  await page.screenshot({
-    path: "docs/phase-6-admin-trips-390x844.png",
-    fullPage: true,
-  });
 });
 
 for (const viewport of [
