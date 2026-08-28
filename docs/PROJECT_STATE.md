@@ -101,7 +101,7 @@ Codex must update this file after every phase.
 
 - Windows reserves port 5432 on this machine, so local PostgreSQL is published on `55432` through `.env` and `POSTGRES_HOST_PORT`.
 - `pnpm-workspace.yaml` uses the local `.pnpm-store` to avoid redirected-profile prompts.
-- The E2E runner owns port `3210`, so it does not collide with development port `3000`.
+- The E2E runner owns port `3210` and recreates the dedicated `TEST_DATABASE_URL` database before browser tests, so it neither collides with development port `3000` nor writes fixture users/orders into the developer database.
 - Fake/dev providers remain active and do not block local development.
 - Next development mode detects this checkout under `Downloads/Compressed` as a slow filesystem (roughly 300–750 ms on this machine). Cold route compilation can therefore take tens of seconds; production-build behavior is the meaningful baseline. Moving a working copy to a short local path such as `C:\dev\RAVA` is recommended but was not performed automatically.
 

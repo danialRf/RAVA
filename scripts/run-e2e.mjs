@@ -29,6 +29,12 @@ const playwrightCli = path.join(
   "test",
   "cli.js",
 );
+const tsxCli = path.join(workspace, "node_modules", "tsx", "dist", "cli.mjs");
+const prepareDatabaseScript = path.join(
+  workspace,
+  "scripts",
+  "prepare-e2e-database.ts",
+);
 const completionFile = path.join(
   workspace,
   "test-results",
@@ -43,12 +49,39 @@ rmSync(completionFile, { force: true });
 const port = process.env.RAVA_E2E_PORT ?? "3210";
 const baseUrl = `http://127.0.0.1:${port}`;
 
+// Never run browser fixtures against the developer database. Recreate the
+// dedicated test database from migrations and seed it before starting Next.
+const databasePreparation = spawnSync(
+  process.execPath,
+  [tsxCli, prepareDatabaseScript],
+  {
+    cwd: workspace,
+    env: process.env,
+    encoding: "utf8",
+    windowsHide: true,
+  },
+);
+
+if (databasePreparation.status !== 0) {
+  process.stderr.write(databasePreparation.stderr ?? "");
+  throw new Error("RAVA E2E database preparation failed.");
+}
+
+const e2eDatabaseUrl = databasePreparation.stdout.trim();
+if (!e2eDatabaseUrl.startsWith("postgresql://")) {
+  throw new Error("RAVA E2E database preparation returned an invalid URL.");
+}
+
 const server = spawn(
   process.execPath,
   [nextCli, "start", "apps/web", "--hostname", "127.0.0.1", "--port", port],
   {
     cwd: workspace,
-    env: { ...process.env, APP_URL: baseUrl },
+    env: {
+      ...process.env,
+      APP_URL: baseUrl,
+      DATABASE_URL: e2eDatabaseUrl,
+    },
     stdio: "inherit",
     windowsHide: true,
   },
@@ -117,6 +150,7 @@ try {
     cwd: workspace,
     env: {
       ...process.env,
+      DATABASE_URL: e2eDatabaseUrl,
       RAVA_E2E_COMPLETION_FILE: completionFile,
       RAVA_E2E_BASE_URL: baseUrl,
     },
