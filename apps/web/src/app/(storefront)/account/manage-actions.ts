@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -12,6 +13,7 @@ import {
   createPrivateUploadRecord,
   createProductRequest,
   deleteAddress,
+  decideOrderReconfirmation,
   setDefaultAddress,
   setNotificationPreference,
   updateDisplayName,
@@ -20,7 +22,9 @@ import { normalizeIranianMobile } from "@rava/domain";
 import { createPrivateStorage } from "@rava/integrations";
 
 import { currentUser, enforceRateLimit } from "../../../server/auth";
+import { beginBalancePayment } from "../../../server/checkout";
 import { database } from "../../../server/db";
+import { checkoutOrigin } from "../../../lib/site";
 
 function value(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -224,4 +228,68 @@ export async function createProductRequestAction(
     imageUploadId,
   });
   message("/find-it", "notice", "درخواست شما ثبت شد و در صف بررسی قرار گرفت.");
+}
+
+export async function decideOrderReconfirmationAction(
+  formData: FormData,
+): Promise<void> {
+  const userId = await requireUserId();
+  const orderId = value(formData, "orderId");
+  const decision = value(formData, "decision");
+  if (
+    !/^[0-9a-f-]{36}$/i.test(orderId) ||
+    !["CONTINUE", "CANCEL"].includes(decision)
+  ) {
+    message(`/account/orders/${orderId}`, "error", "تصمیم ثبت‌شده معتبر نیست.");
+  }
+  try {
+    await decideOrderReconfirmation(database(), {
+      orderId,
+      userId,
+      decision: decision as "CONTINUE" | "CANCEL",
+    });
+  } catch {
+    message(
+      `/account/orders/${orderId}`,
+      "error",
+      "این سفارش دیگر در انتظار تصمیم شما نیست.",
+    );
+  }
+  message(
+    `/account/orders/${orderId}`,
+    "notice",
+    decision === "CONTINUE"
+      ? "ادامه تهیه تأیید شد و سفارش دوباره وارد صف خرید شد."
+      : "درخواست لغو ثبت شد و سفارش وارد صف بازپرداخت شد.",
+  );
+}
+
+export async function beginBalancePaymentAction(
+  formData: FormData,
+): Promise<void> {
+  const userId = await requireUserId();
+  const orderId = value(formData, "orderId");
+  const method =
+    value(formData, "method") === "CARD_TO_CARD" ? "CARD_TO_CARD" : "GATEWAY";
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) redirect("/account/orders");
+  let result;
+  try {
+    const requestHeaders = await headers();
+    const origin = checkoutOrigin(requestHeaders.get("host"));
+    result = await beginBalancePayment({
+      orderId,
+      userId,
+      method,
+      callbackUrl: new URL("/api/payments/fake/callback", origin).toString(),
+      origin,
+    });
+  } catch {
+    message(
+      `/account/orders/${orderId}`,
+      "error",
+      "پرداخت مانده قابل شروع نیست؛ وضعیت سفارش را دوباره بررسی کنید.",
+    );
+  }
+  if (result.redirectUrl) redirect(result.redirectUrl);
+  redirect(`/checkout/payment/card/${result.payment.id}`);
 }

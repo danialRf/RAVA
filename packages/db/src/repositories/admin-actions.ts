@@ -1,4 +1,5 @@
 import {
+  assertOrderTransition,
   orderItemProcurementStateMachine,
   orderStateMachine,
   paymentStateMachine,
@@ -78,7 +79,13 @@ export async function reviewCardPayment(
       .where(eq(orders.id, payment.orderId))
       .for("update")
       .limit(1);
-    if (order === undefined || order.status !== "DEPOSIT_PENDING") {
+    const expectedOrderStatus =
+      payment.type === "DEPOSIT" ? "DEPOSIT_PENDING" : "BALANCE_DUE";
+    if (
+      order === undefined ||
+      !["DEPOSIT", "BALANCE"].includes(payment.type) ||
+      order.status !== expectedOrderStatus
+    ) {
       throw new AdminOperationError("ORDER_NOT_PAYABLE");
     }
 
@@ -101,14 +108,43 @@ export async function reviewCardPayment(
         before: { status: payment.status },
         after: { status: "FAILED", reason },
       });
-      return { decision: input.decision, orderId: order.id } as const;
+      return {
+        decision: input.decision,
+        orderId: order.id,
+        paymentType: payment.type,
+      } as const;
     }
 
-    if (payment.amountToman !== order.depositRequiredToman) {
+    const expectedAmount =
+      payment.type === "DEPOSIT"
+        ? order.depositRequiredToman
+        : order.balanceDueToman - order.balancePaidToman;
+    if (payment.amountToman !== expectedAmount) {
       throw new AdminOperationError("PAYMENT_AMOUNT_MISMATCH");
     }
     paymentStateMachine.assertTransition(payment.status, "SUCCEEDED");
-    await ensurePurchaseTasksForOrder(tx, order.id);
+    const nextMoney = {
+      totalLockedToman: order.totalLockedToman,
+      depositRequiredToman: order.depositRequiredToman,
+      depositPaidToman:
+        payment.type === "DEPOSIT"
+          ? payment.amountToman
+          : order.depositPaidToman,
+      balanceDueToman: order.balanceDueToman,
+      balancePaidToman:
+        payment.type === "BALANCE"
+          ? payment.amountToman
+          : order.balancePaidToman,
+    };
+    if (payment.type === "DEPOSIT") {
+      assertOrderTransition("DEPOSIT_PENDING", "DEPOSIT_PAID", nextMoney);
+      orderStateMachine.assertTransition("DEPOSIT_PAID", "PROCUREMENT_PENDING");
+    } else {
+      assertOrderTransition("BALANCE_DUE", "BALANCE_PAID", nextMoney);
+    }
+    if (payment.type === "DEPOSIT") {
+      await ensurePurchaseTasksForOrder(tx, order.id);
+    }
     await tx
       .update(payments)
       .set({
@@ -122,33 +158,56 @@ export async function reviewCardPayment(
       .update(paymentReceipts)
       .set({ reviewedByUserId: input.actorUserId, reviewNote: reason })
       .where(eq(paymentReceipts.id, receipt.id));
-    await tx
-      .update(orders)
-      .set({
-        depositPaidToman: payment.amountToman,
-        status: "PROCUREMENT_PENDING",
-        updatedAt: now,
-      })
-      .where(eq(orders.id, order.id));
-    await tx.insert(orderStatusHistory).values([
-      {
+    const nextOrderStatus =
+      payment.type === "DEPOSIT" ? "PROCUREMENT_PENDING" : "BALANCE_PAID";
+    if (payment.type === "DEPOSIT") {
+      await tx
+        .update(orders)
+        .set({
+          depositPaidToman: payment.amountToman,
+          status: nextOrderStatus,
+          updatedAt: now,
+        })
+        .where(eq(orders.id, order.id));
+      await tx.insert(orderStatusHistory).values([
+        {
+          orderId: order.id,
+          fromStatus: "DEPOSIT_PENDING",
+          toStatus: "DEPOSIT_PAID",
+          actorUserId: input.actorUserId,
+          note: "پیش‌پرداخت کارت‌به‌کارت تأیید شد",
+        },
+        {
+          orderId: order.id,
+          fromStatus: "DEPOSIT_PAID",
+          toStatus: "PROCUREMENT_PENDING",
+          actorUserId: input.actorUserId,
+        },
+      ]);
+    } else {
+      await tx
+        .update(orders)
+        .set({
+          balancePaidToman: payment.amountToman,
+          status: nextOrderStatus,
+          updatedAt: now,
+        })
+        .where(eq(orders.id, order.id));
+      await tx.insert(orderStatusHistory).values({
         orderId: order.id,
-        fromStatus: "DEPOSIT_PENDING",
-        toStatus: "DEPOSIT_PAID",
+        fromStatus: "BALANCE_DUE",
+        toStatus: "BALANCE_PAID",
         actorUserId: input.actorUserId,
-        note: "پیش‌پرداخت کارت‌به‌کارت تأیید شد",
-      },
-      {
-        orderId: order.id,
-        fromStatus: "DEPOSIT_PAID",
-        toStatus: "PROCUREMENT_PENDING",
-        actorUserId: input.actorUserId,
-      },
-    ]);
+        note: "مانده کارت‌به‌کارت تأیید شد",
+      });
+    }
     await tx.insert(outboxEvents).values({
       aggregateType: "order",
       aggregateId: order.id,
-      eventType: "order.deposit_paid",
+      eventType:
+        payment.type === "DEPOSIT"
+          ? "order.deposit_paid"
+          : "order.balance_paid",
       payload: {
         orderNumber: order.orderNumber,
         amountToman: payment.amountToman.toString(),
@@ -163,12 +222,16 @@ export async function reviewCardPayment(
       before: { status: payment.status, orderStatus: order.status },
       after: {
         status: "SUCCEEDED",
-        orderStatus: "PROCUREMENT_PENDING",
+        orderStatus: nextOrderStatus,
         amountToman: payment.amountToman.toString(),
         reason,
       },
     });
-    return { decision: input.decision, orderId: order.id } as const;
+    return {
+      decision: input.decision,
+      orderId: order.id,
+      paymentType: payment.type,
+    } as const;
   });
 }
 

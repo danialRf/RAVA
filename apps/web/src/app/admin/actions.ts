@@ -17,6 +17,7 @@ import {
   updateAdminRetailer,
   updateAdminTripStatus,
   updateProcurementItem,
+  operateOrderLifecycle,
 } from "@rava/db";
 import {
   createPrivateStorage,
@@ -86,8 +87,9 @@ export async function reviewCardPaymentAction(formData: FormData) {
   if (!UUID.test(paymentId) || !["APPROVE", "REJECT"].includes(decision)) {
     destination("/admin/payments", "error", "درخواست بررسی معتبر نیست.");
   }
+  let result;
   try {
-    await reviewCardPayment(database(), {
+    result = await reviewCardPayment(database(), {
       paymentId,
       actorUserId: user.id,
       decision: decision as "APPROVE" | "REJECT",
@@ -107,7 +109,9 @@ export async function reviewCardPaymentAction(formData: FormData) {
     "/admin/payments",
     "notice",
     decision === "APPROVE"
-      ? "پرداخت تأیید و وارد صف تهیه شد."
+      ? result.paymentType === "BALANCE"
+        ? "پرداخت مانده تأیید شد و سفارش آماده ارسال داخلی است."
+        : "پیش‌پرداخت تأیید و سفارش وارد صف تهیه شد."
       : "پرداخت با ثبت دلیل رد شد.",
   );
 }
@@ -552,4 +556,57 @@ export async function assignOrderToTripAction(formData: FormData) {
   revalidatePath("/admin/trips");
   revalidatePath(`/admin/orders/${orderId}`);
   destination("/admin/trips", "notice", "سفارش به سفر تخصیص یافت.");
+}
+
+export async function operateOrderLifecycleAction(formData: FormData) {
+  const action = field(formData, "action");
+  const permission = ["REQUEST_REFUND", "COMPLETE_REFUND"].includes(action)
+    ? "PAYMENTS_REVIEW"
+    : "TRIPS_WRITE";
+  const user = await requireAdmin(permission);
+  const orderId = field(formData, "orderId");
+  if (
+    !UUID.test(orderId) ||
+    ![
+      "START_LOCAL_DELIVERY",
+      "DISPATCH_LOCAL",
+      "DELIVERY_FAILED",
+      "DELIVER",
+      "REQUEST_REFUND",
+      "COMPLETE_REFUND",
+    ].includes(action)
+  ) {
+    destination("/admin/orders", "error", "عملیات سفارش معتبر نیست.");
+  }
+  try {
+    await operateOrderLifecycle(database(), {
+      orderId,
+      actorUserId: user.id,
+      action: action as
+        | "START_LOCAL_DELIVERY"
+        | "DISPATCH_LOCAL"
+        | "DELIVERY_FAILED"
+        | "DELIVER"
+        | "REQUEST_REFUND"
+        | "COMPLETE_REFUND",
+      courier: field(formData, "courier"),
+      trackingCode: field(formData, "trackingCode"),
+      reason: field(formData, "reason"),
+      refundReference: field(formData, "refundReference"),
+    });
+  } catch {
+    destination(
+      `/admin/orders/${orderId}`,
+      "error",
+      "عملیات با وضعیت فعلی سفارش یا اطلاعات واردشده سازگار نیست.",
+    );
+  }
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath("/admin/orders");
+  destination(
+    `/admin/orders/${orderId}`,
+    "notice",
+    "مرحله سفارش با ثبت تاریخچه و ممیزی به‌روزرسانی شد.",
+  );
 }

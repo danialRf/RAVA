@@ -3141,6 +3141,35 @@ body {
   width: min(100%, 38rem);
   margin-inline: auto;
 }
+.order-timeline {
+  display: grid;
+  gap: 0;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.order-timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto;
+  gap: 0.25rem 1rem;
+  padding: 0.85rem 1.25rem 0.85rem 0;
+  border-inline-start: 1px solid var(--line);
+}
+.order-timeline li::before {
+  position: absolute;
+  inset-inline-start: -0.32rem;
+  top: 1.2rem;
+  width: 0.58rem;
+  height: 0.58rem;
+  border-radius: 50%;
+  background: var(--rava-rose);
+  content: "";
+}
+.order-timeline li span {
+  grid-column: 1 / -1;
+  color: var(--rava-muted-ink);
+}
 .order-overview {
   display: grid;
   gap: 1rem;

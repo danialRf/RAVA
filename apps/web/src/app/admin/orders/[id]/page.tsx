@@ -1,4 +1,4 @@
-import { formatEurCents } from "@rava/domain";
+import { formatEurCents, hasAdminPermission } from "@rava/domain";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -9,7 +9,10 @@ import {
   procurementStatusFa,
 } from "../../../../lib/order-status";
 import { adminQueries, requireAdmin } from "../../../../server/admin";
-import { receiveOrderInGermanyAction } from "../../actions";
+import {
+  operateOrderLifecycleAction,
+  receiveOrderInGermanyAction,
+} from "../../actions";
 
 export default async function AdminOrderDetailsPage({
   params,
@@ -17,7 +20,7 @@ export default async function AdminOrderDetailsPage({
 }: PageProps<"/admin/orders/[id]"> & {
   searchParams: Promise<{ notice?: string; error?: string }>;
 }) {
-  await requireAdmin("ORDERS_READ");
+  const user = await requireAdmin("ORDERS_READ");
   const { id } = await params;
   const query = await searchParams;
   const result = await adminQueries.orderDetails(id);
@@ -50,6 +53,105 @@ export default async function AdminOrderDetailsPage({
           <button type="submit">ثبت دریافت و ورود به صف سفر</button>
         </form>
       )}
+      {result.order.status === "BALANCE_PAID" &&
+        hasAdminPermission(user.role, "TRIPS_WRITE") && (
+          <form
+            action={operateOrderLifecycleAction}
+            className="admin-command-bar"
+          >
+            <input type="hidden" name="orderId" value={result.order.id} />
+            <input type="hidden" name="action" value="START_LOCAL_DELIVERY" />
+            <div>
+              <span>ارسال داخلی</span>
+              <strong>مانده پرداخت شده و سفارش آماده ارسال است.</strong>
+            </div>
+            <button type="submit">ورود به صف ارسال</button>
+          </form>
+        )}
+      {result.order.status === "LOCAL_DELIVERY_PENDING" &&
+        hasAdminPermission(user.role, "TRIPS_WRITE") && (
+          <form
+            action={operateOrderLifecycleAction}
+            className="admin-form-grid admin-create-panel"
+          >
+            <input type="hidden" name="orderId" value={result.order.id} />
+            <input type="hidden" name="action" value="DISPATCH_LOCAL" />
+            <label>
+              پیک یا شرکت حمل
+              <input name="courier" required minLength={3} />
+            </label>
+            <label>
+              کد پیگیری
+              <input name="trackingCode" dir="ltr" required minLength={3} />
+            </label>
+            <button type="submit">ثبت خروج برای تحویل</button>
+          </form>
+        )}
+      {result.order.status === "OUT_FOR_DELIVERY" &&
+        hasAdminPermission(user.role, "TRIPS_WRITE") && (
+          <div className="admin-command-bar">
+            <form action={operateOrderLifecycleAction}>
+              <input type="hidden" name="orderId" value={result.order.id} />
+              <button name="action" value="DELIVER">
+                تأیید تحویل
+              </button>
+            </form>
+            <form
+              action={operateOrderLifecycleAction}
+              className="admin-review-form"
+            >
+              <input type="hidden" name="orderId" value={result.order.id} />
+              <input
+                name="reason"
+                required
+                minLength={3}
+                placeholder="دلیل ناموفق بودن تحویل"
+              />
+              <button
+                name="action"
+                value="DELIVERY_FAILED"
+                className="button secondary"
+              >
+                بازگشت به صف ارسال
+              </button>
+            </form>
+          </div>
+        )}
+      {result.order.status === "REFUND_PENDING" &&
+        hasAdminPermission(user.role, "PAYMENTS_REVIEW") && (
+          <form
+            action={operateOrderLifecycleAction}
+            className="admin-form-grid admin-create-panel"
+          >
+            <input type="hidden" name="orderId" value={result.order.id} />
+            <input type="hidden" name="action" value="COMPLETE_REFUND" />
+            <label className="wide">
+              شماره پیگیری بازپرداخت
+              <input name="refundReference" dir="ltr" required minLength={3} />
+            </label>
+            <button type="submit">ثبت بازپرداخت کامل</button>
+          </form>
+        )}
+      {result.order.status === "DELIVERED" &&
+        hasAdminPermission(user.role, "PAYMENTS_REVIEW") && (
+          <details className="admin-create-panel">
+            <summary>ثبت درخواست مرجوعی و بازپرداخت</summary>
+            <form
+              action={operateOrderLifecycleAction}
+              className="admin-form-grid"
+            >
+              <input type="hidden" name="orderId" value={result.order.id} />
+              <input type="hidden" name="action" value="REQUEST_REFUND" />
+              <label className="wide">
+                دلیل مستند
+                <input name="reason" required minLength={3} maxLength={500} />
+              </label>
+              <button className="button danger" type="submit">
+                ورود به صف بازپرداخت
+              </button>
+            </form>
+          </details>
+        )}
       <div className="admin-order-detail">
         <section>
           <h2>اقلام قفل‌شده سفارش</h2>

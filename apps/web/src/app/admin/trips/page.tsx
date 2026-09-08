@@ -6,6 +6,16 @@ import {
   updateTripStatusAction,
 } from "../actions";
 
+const TRIP_STATUS_FA: Record<TripStatus, string> = {
+  PLANNED: "برنامه‌ریزی‌شده",
+  COLLECTING: "در حال جمع‌آوری",
+  PACKED: "بسته‌بندی‌شده",
+  DEPARTED: "حرکت‌کرده از آلمان",
+  ARRIVED: "رسیده به ایران",
+  DISTRIBUTED: "توزیع‌شده",
+  CANCELLED: "لغوشده",
+};
+
 export default async function AdminTripsPage({
   searchParams,
 }: {
@@ -81,22 +91,24 @@ export default async function AdminTripsPage({
                 {t.itemCount} قلم · {t.assignedWeightGrams} از{" "}
                 {t.capacityWeightGrams ?? "نامعلوم"} گرم
               </span>
+              <span className="admin-status">{TRIP_STATUS_FA[t.status]}</span>
               <form action={updateTripStatusAction}>
                 <input type="hidden" name="id" value={t.id} />
-                <select name="status" defaultValue={t.status}>
-                  {[
-                    "PLANNED",
-                    "COLLECTING",
-                    "PACKED",
-                    "DEPARTED",
-                    "ARRIVED",
-                    "DISTRIBUTED",
-                    "CANCELLED",
-                  ].map((v) => (
-                    <option key={v}>{v}</option>
+                <select name="status" defaultValue="" required>
+                  <option value="" disabled>
+                    مرحله بعد را انتخاب کنید
+                  </option>
+                  {tripStateMachine.nextStates(t.status).map((v) => (
+                    <option value={v} key={v}>
+                      {TRIP_STATUS_FA[v]}
+                    </option>
                   ))}
                 </select>
-                <button disabled={!writable}>ثبت وضعیت</button>
+                <button
+                  disabled={!writable || tripStateMachine.isTerminal(t.status)}
+                >
+                  ثبت وضعیت
+                </button>
               </form>
             </article>
           ))}
@@ -145,3 +157,4 @@ export default async function AdminTripsPage({
     </>
   );
 }
+import { tripStateMachine, type TripStatus } from "@rava/domain";

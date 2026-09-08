@@ -190,8 +190,11 @@ describe("order transitions", () => {
     ).toBe(true);
   });
 
-  it("treats DELIVERED, CANCELLED and REFUNDED as terminal", () => {
-    for (const status of ["DELIVERED", "CANCELLED", "REFUNDED"] as const) {
+  it("keeps delivered orders refundable and terminalizes cancellations/refunds", () => {
+    expect(orderStateMachine.canTransition("DELIVERED", "REFUND_PENDING")).toBe(
+      true,
+    );
+    for (const status of ["CANCELLED", "REFUNDED"] as const) {
       expect(orderStateMachine.isTerminal(status)).toBe(true);
     }
   });
@@ -286,6 +289,9 @@ describe("procurement and logistics transitions", () => {
   });
 
   it("lets a blocked purchase task resume", () => {
+    expect(purchaseTaskStateMachine.canTransition("BLOCKED", "OPEN")).toBe(
+      true,
+    );
     expect(
       purchaseTaskStateMachine.canTransition("BLOCKED", "IN_PROGRESS"),
     ).toBe(true);

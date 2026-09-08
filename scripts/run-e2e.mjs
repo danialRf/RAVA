@@ -81,6 +81,9 @@ const server = spawn(
       ...process.env,
       APP_URL: baseUrl,
       DATABASE_URL: e2eDatabaseUrl,
+      // Browser tests must be deterministic even when the developer has not
+      // started MinIO. The S3-compatible adapter is covered independently.
+      STORAGE_PROVIDER: "fake",
     },
     stdio: "inherit",
     windowsHide: true,
@@ -151,6 +154,7 @@ try {
     env: {
       ...process.env,
       DATABASE_URL: e2eDatabaseUrl,
+      STORAGE_PROVIDER: "fake",
       RAVA_E2E_COMPLETION_FILE: completionFile,
       RAVA_E2E_BASE_URL: baseUrl,
     },

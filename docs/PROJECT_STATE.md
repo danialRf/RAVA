@@ -14,7 +14,7 @@ Codex must update this file after every phase.
 
 ## Current phase
 
-`PHASE_7_POST_PURCHASE_LIFECYCLE_READY`
+`PHASE_7_LAUNCH_MVP_COMPLETE_WITH_EXTERNAL_BLOCKERS`
 
 ## Completed
 
@@ -28,6 +28,7 @@ Codex must update this file after every phase.
 
 - Phase 6 admin foundation, RBAC, audited payment/procurement actions and dedicated operations workspace — 2026-08-26.
 - Phase 6 complete admin operating system: catalog, offers, pricing, trips, customers, requests, sources, content, health, procurement evidence and audit — 2026-08-26.
+- Phase 7 final launch MVP: post-purchase lifecycle, balance collection, customer reconfirmation, trip propagation, local delivery, refund recording and deployment hardening — 2026-09-08.
 
 ## Delivered foundations
 
@@ -75,6 +76,15 @@ Codex must update this file after every phase.
 - Checkout pages are `noindex`, and the development gateway accepts only the authority persisted for the owned payment.
 - The worker refreshes the FX snapshot on an interval and logs each success or failure.
 
+### Post-purchase lifecycle
+
+- A sourcing failure now creates an explicit customer decision: continue sourcing or cancel and enter the refund queue. Continuing safely reopens the blocked procurement tasks instead of creating duplicates.
+- Deposit and balance payments use the same typed, idempotent payment-intent boundary. A balance callback can credit only the exact remaining locked amount and advances the order to `BALANCE_PAID` once.
+- Germany-trip state changes propagate transactionally to linked customer orders: departure moves them into transit and Iran arrival makes the locked balance due.
+- The admin order workspace can create the local-delivery job, record courier/tracking information, dispatch, requeue a failed attempt, confirm delivery, request a refund and complete the refund with an external reference.
+- Customers see the trip, local courier/tracking information and complete status history without seeing staff-only costs or private evidence.
+- Refunds are positive, idempotent payment records and every operational change writes order history, outbox data and an actor audit entry in the same transaction.
+
 ## Current architecture decisions
 
 - Next.js App Router web app plus a separate worker inside the TypeScript monorepo; no premature microservices.
@@ -101,25 +111,23 @@ Codex must update this file after every phase.
 
 - Windows reserves port 5432 on this machine, so local PostgreSQL is published on `55432` through `.env` and `POSTGRES_HOST_PORT`.
 - `pnpm-workspace.yaml` uses the local `.pnpm-store` to avoid redirected-profile prompts.
-- The E2E runner owns port `3210` and recreates the dedicated `TEST_DATABASE_URL` database before browser tests, so it neither collides with development port `3000` nor writes fixture users/orders into the developer database.
+- The E2E runner temporarily owns port `3210`, recreates the dedicated `TEST_DATABASE_URL` database and uses deterministic private in-memory storage. It neither collides with development port `3000`, depends on MinIO availability nor writes fixture users/orders into the developer database.
 - Fake/dev providers remain active and do not block local development.
 - Next development mode detects this checkout under `Downloads/Compressed` as a slow filesystem (roughly 300–750 ms on this machine). Cold route compilation can therefore take tens of seconds; production-build behavior is the meaningful baseline. Moving a working copy to a short local path such as `C:\dev\RAVA` is recommended but was not performed automatically.
 
-## Open external credentials
+## External launch blockers
 
-- Production domain/host.
-- Google OAuth.
-- SMS and transactional email.
-- Payment gateway.
-- Telegram.
-- Production FX provider.
-- Production S3-compatible object storage.
+- A production domain/host with HTTPS.
+- A selected Iranian payment provider, merchant credentials and its concrete adapter. The repository intentionally contains no pretend production gateway.
+- Production SMS, transactional email, FX and S3-compatible object-storage credentials.
+- Reviewed legal/privacy/returns content and rights-cleared catalog facts and photography.
 
-## Known limitations
+Google OAuth and Telegram are optional post-launch integrations, not launch blockers.
 
-- Only the deposit is collected. Procurement purchase completion is implemented, but balance settlement, customer reconfirmation decisions, refunds, Germany dispatch, Iran arrival, local delivery and returns are later lifecycle slices.
+## Deliberately deferred after launch
+
 - Card-to-card receipts remain `PENDING_VERIFICATION` until an authorized finance user approves or rejects them in the admin payment queue.
-- The gateway is `FakePaymentGateway` behind the `PaymentGateway` interface, including a local approval screen that stands in for the bank. No production gateway is wired.
+- Local development uses `FakePaymentGateway` behind the swappable `PaymentGateway` interface. Real payments remain blocked until the chosen provider is implemented and verified with merchant credentials.
 - Authenticity remains a presentation shell.
 - Variant selection is not yet the interactive checkout selector.
 - Recently viewed remains browser-local.
@@ -129,7 +137,18 @@ Codex must update this file after every phase.
 - Real Google, SMS, SMTP and production storage integrations cannot be end-to-end verified until credentials are supplied.
 - `pnpm test` requires the local PostgreSQL infrastructure; `pnpm test:unit` does not.
 
-## Latest verification (2026-08-26)
+Automated retailer scraping, multi-source deal scoring, marketing-card/Telegram automation, advanced personalization, loyalty/referrals and analytics dashboards were removed from the launch roadmap. They are post-launch investments only if real usage justifies them.
+
+## Latest verification (2026-09-08)
+
+Passed after completing the final launch MVP:
+
+- `pnpm format:check`, `pnpm lint` and workspace-wide `pnpm typecheck`.
+- `pnpm test` — 14 files and 166 tests passed, including idempotent balance capture, sourcing-failure reconfirmation, trip propagation, delivery and audited refund completion.
+- Production Next.js build — all 49 application routes compiled successfully.
+- `pnpm worker:smoke`.
+- `pnpm test:e2e` — all 23 storefront, account, checkout, RBAC, upload and responsive-browser tests passed. Browser tests use isolated storage and an isolated database.
+- A Docker build definition, security headers, production-environment preflight and one-command local production runner are included.
 
 Passed after completing Phase 6 admin operations:
 
@@ -171,6 +190,6 @@ Passed after Phase 5 hardening:
 The repository is versioned on GitHub at `danialRf/RAVA`; CI generates Next.js route types before TypeScript checking so a clean runner matches local verification.
 CI uses the deterministic private-storage adapter because its service matrix does not run MinIO; local development continues to exercise MinIO through Docker Compose.
 
-## Next phase
+## Next action
 
-Begin Phase 7: complete customer reconfirmation choices, balance collection, Germany dispatch, Iran arrival, local delivery, cancellation/refund handling and customer notifications. Production provider credentials and rights-cleared product photography remain external launch dependencies.
+There is no additional internal build phase before the MVP. Follow `docs/PRODUCTION_CHECKLIST.md`: choose the real providers, supply credentials/content, implement and certify the selected payment adapter in staging, then deploy the already-tested release. Product automation and growth features stay outside the launch critical path.

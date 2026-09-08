@@ -1,5 +1,9 @@
-import { assertOrderTransition, orderStateMachine } from "@rava/domain";
-import { eq } from "drizzle-orm";
+import {
+  assertOrderTransition,
+  orderStateMachine,
+  tripStateMachine,
+} from "@rava/domain";
+import { eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -279,8 +283,105 @@ export async function updateAdminTripStatus(
       .for("update")
       .limit(1);
     if (!before) throw new AdminOperationError("TRIP_NOT_FOUND");
+    tripStateMachine.assertTransition(before.status, input.status);
     const after = { status: input.status, updatedAt: new Date() };
     await tx.update(trips).set(after).where(eq(trips.id, input.id));
+
+    const assignedOrders = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.tripId, before.id))
+      .for("update");
+    for (const order of assignedOrders) {
+      const transitions: Array<{
+        from: typeof order.status;
+        to: typeof order.status;
+        note: string;
+      }> = [];
+      if (input.status === "DEPARTED" && order.status === "TRIP_ASSIGNED") {
+        transitions.push({
+          from: "TRIP_ASSIGNED",
+          to: "IN_TRANSIT_TO_IRAN",
+          note: "سفر از آلمان حرکت کرد",
+        });
+      } else if (
+        input.status === "ARRIVED" &&
+        order.status === "IN_TRANSIT_TO_IRAN"
+      ) {
+        transitions.push(
+          {
+            from: "IN_TRANSIT_TO_IRAN",
+            to: "ARRIVED_IRAN",
+            note: "سفارش به ایران رسید",
+          },
+          {
+            from: "ARRIVED_IRAN",
+            to: "BALANCE_DUE",
+            note: "مانده سفارش آماده پرداخت است",
+          },
+        );
+      } else if (
+        input.status === "CANCELLED" &&
+        order.status === "TRIP_ASSIGNED"
+      ) {
+        transitions.push({
+          from: "TRIP_ASSIGNED",
+          to: "TRIP_PENDING",
+          note: "سفر لغو شد و سفارش به صف تخصیص برگشت",
+        });
+      }
+      if (transitions.length === 0) continue;
+      for (const transition of transitions) {
+        orderStateMachine.assertTransition(transition.from, transition.to);
+      }
+      const finalStatus = transitions.at(-1)!.to;
+      await tx
+        .update(orders)
+        .set({
+          status: finalStatus,
+          tripId: input.status === "CANCELLED" ? null : order.tripId,
+          updatedAt: after.updatedAt,
+        })
+        .where(eq(orders.id, order.id));
+      await tx.insert(orderStatusHistory).values(
+        transitions.map((transition) => ({
+          orderId: order.id,
+          fromStatus: transition.from,
+          toStatus: transition.to,
+          actorUserId: input.actorUserId,
+          note: transition.note,
+        })),
+      );
+      await tx.insert(outboxEvents).values({
+        aggregateType: "order",
+        aggregateId: order.id,
+        eventType: "order.status_changed",
+        payload: {
+          orderNumber: order.orderNumber,
+          from: order.status,
+          to: finalStatus,
+          tripId: before.id,
+        },
+      });
+    }
+
+    if (input.status === "PACKED") {
+      const linkedItems = await tx
+        .select({ id: tripItems.orderItemId })
+        .from(tripItems)
+        .where(eq(tripItems.tripId, before.id));
+      if (linkedItems.length > 0) {
+        await tx
+          .update(orderItems)
+          .set({ procurementStatus: "PACKED", updatedAt: after.updatedAt })
+          .where(
+            inArray(
+              orderItems.id,
+              linkedItems.map(({ id }) => id),
+            ),
+          );
+      }
+    }
     await audit(
       tx,
       input.actorUserId,

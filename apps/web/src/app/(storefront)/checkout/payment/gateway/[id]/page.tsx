@@ -47,14 +47,22 @@ export default async function GatewaySimulatorPage({
     <div className="section-shell checkout-page gateway-page">
       <PageIntro
         eyebrow="درگاه پرداخت آزمایشی"
-        title="تأیید پیش‌پرداخت"
+        title={
+          owned.payment.type === "BALANCE"
+            ? "تأیید پرداخت مانده"
+            : "تأیید پیش‌پرداخت"
+        }
         copy="این صفحه شبیه‌سازی درگاه بانکی برای محیط توسعه است. هیچ اطلاعات کارتی دریافت یا ذخیره نمی‌شود."
       />
 
       <section className="receipt-card">
         <dl>
           <div>
-            <dt>مبلغ پیش‌پرداخت</dt>
+            <dt>
+              {owned.payment.type === "BALANCE"
+                ? "مبلغ مانده"
+                : "مبلغ پیش‌پرداخت"}
+            </dt>
             <dd>{formatToman(owned.payment.amountToman)} تومان</dd>
           </div>
           <div>

@@ -367,6 +367,7 @@ export async function listPaymentsNeedingReview(
       orderId: payments.orderId,
       orderNumber: orders.orderNumber,
       amountToman: payments.amountToman,
+      type: payments.type,
       method: payments.method,
       status: payments.status,
       customerName: users.displayName,

@@ -249,6 +249,50 @@ export async function beginOrderPayment(input: {
   return { order, payment, redirectUrl: created.redirectUrl };
 }
 
+export async function beginBalancePayment(input: {
+  readonly orderId: string;
+  readonly userId: string;
+  readonly method: "GATEWAY" | "CARD_TO_CARD";
+  readonly callbackUrl: string;
+  readonly origin: string;
+}) {
+  const owned = await getOwnedOrder(database(), input.orderId, input.userId);
+  if (!owned || owned.order.status !== "BALANCE_DUE") {
+    throw new Error("ORDER_NOT_PAYABLE");
+  }
+  const amount = owned.order.balanceDueToman - owned.order.balancePaidToman;
+  if (amount <= 0n) throw new Error("BALANCE_NOT_DUE");
+
+  const environment = loadEnvironment();
+  const gateway = createPaymentGateway(environment);
+  const payment = await createPaymentIntent(database(), {
+    orderId: owned.order.id,
+    type: "BALANCE",
+    method: input.method,
+    provider: input.method === "GATEWAY" ? gateway.id : "manual",
+    amountToman: amount,
+    idempotencyKey: `balance:${owned.order.id}:${input.method}`,
+  });
+  if (input.method === "CARD_TO_CARD") {
+    return { order: owned.order, payment, redirectUrl: null };
+  }
+  const created = await gateway.createPayment({
+    paymentId: payment.id,
+    orderId: owned.order.id,
+    amountToman: payment.amountToman,
+    callbackUrl: input.callbackUrl,
+    hostedPageUrl: new URL(
+      `/checkout/payment/gateway/${payment.id}`,
+      input.origin,
+    ).toString(),
+  });
+  await setPaymentAuthority(database(), {
+    paymentId: payment.id,
+    authority: created.authority,
+  });
+  return { order: owned.order, payment, redirectUrl: created.redirectUrl };
+}
+
 export async function paymentForCallback(authority: string) {
   return findPaymentByAuthority(database(), authority);
 }

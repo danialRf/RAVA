@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 
+import {
+  assertOrderTransition,
+  orderStateMachine,
+  paymentStateMachine,
+} from "@rava/domain";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "../client";
@@ -9,9 +14,10 @@ import {
   cartItems,
   carts,
   categories,
+  localDeliveries,
   orderItems,
-  orders,
   orderStatusHistory,
+  orders,
   outboxEvents,
   paymentReceipts,
   payments,
@@ -22,6 +28,7 @@ import {
   quotes,
   retailers,
   sourceOffers,
+  trips,
 } from "../schema";
 import type { Executor } from "./executor";
 import { ensurePurchaseTasksForOrder } from "./procurement";
@@ -462,6 +469,7 @@ export async function createPaymentIntent(
   executor: Executor,
   input: {
     readonly orderId: string;
+    readonly type?: "DEPOSIT" | "BALANCE";
     readonly method: "GATEWAY" | "CARD_TO_CARD";
     readonly provider: string;
     readonly amountToman: bigint;
@@ -470,7 +478,7 @@ export async function createPaymentIntent(
 ) {
   const [payment] = await executor
     .insert(payments)
-    .values({ ...input, type: "DEPOSIT", status: "INITIATED" })
+    .values({ ...input, type: input.type ?? "DEPOSIT", status: "INITIATED" })
     .onConflictDoNothing({ target: payments.idempotencyKey })
     .returning();
   if (payment) return payment;
@@ -568,7 +576,7 @@ export async function submitPaymentReceipt(
   });
 }
 
-export async function completeGatewayDeposit(
+export async function completeGatewayPayment(
   db: Database,
   input: {
     readonly authority: string;
@@ -593,10 +601,34 @@ export async function completeGatewayDeposit(
       .where(eq(orders.id, payment.orderId))
       .for("update")
       .limit(1);
-    if (!order || order.status !== "DEPOSIT_PENDING")
+    const expectedOrderStatus =
+      payment.type === "DEPOSIT" ? "DEPOSIT_PENDING" : "BALANCE_DUE";
+    if (
+      !order ||
+      !["DEPOSIT", "BALANCE"].includes(payment.type) ||
+      order.status !== expectedOrderStatus
+    )
       throw new Error("ORDER_NOT_PAYABLE");
+    paymentStateMachine.assertTransition(payment.status, "SUCCEEDED");
+    const nextMoney = {
+      totalLockedToman: order.totalLockedToman,
+      depositRequiredToman: order.depositRequiredToman,
+      depositPaidToman:
+        payment.type === "DEPOSIT" ? input.amountToman : order.depositPaidToman,
+      balanceDueToman: order.balanceDueToman,
+      balancePaidToman:
+        payment.type === "BALANCE" ? input.amountToman : order.balancePaidToman,
+    };
+    if (payment.type === "DEPOSIT") {
+      assertOrderTransition("DEPOSIT_PENDING", "DEPOSIT_PAID", nextMoney);
+      orderStateMachine.assertTransition("DEPOSIT_PAID", "PROCUREMENT_PENDING");
+    } else {
+      assertOrderTransition("BALANCE_DUE", "BALANCE_PAID", nextMoney);
+    }
     const now = new Date();
-    await ensurePurchaseTasksForOrder(tx, order.id);
+    if (payment.type === "DEPOSIT") {
+      await ensurePurchaseTasksForOrder(tx, order.id);
+    }
     const [updatedPayment] = await tx
       .update(payments)
       .set({
@@ -607,31 +639,51 @@ export async function completeGatewayDeposit(
       })
       .where(eq(payments.id, payment.id))
       .returning();
-    await tx
-      .update(orders)
-      .set({
-        depositPaidToman: input.amountToman,
-        status: "PROCUREMENT_PENDING",
-        updatedAt: now,
-      })
-      .where(eq(orders.id, order.id));
-    await tx.insert(orderStatusHistory).values([
-      {
+    if (payment.type === "DEPOSIT") {
+      await tx
+        .update(orders)
+        .set({
+          depositPaidToman: input.amountToman,
+          status: "PROCUREMENT_PENDING",
+          updatedAt: now,
+        })
+        .where(eq(orders.id, order.id));
+      await tx.insert(orderStatusHistory).values([
+        {
+          orderId: order.id,
+          fromStatus: "DEPOSIT_PENDING",
+          toStatus: "DEPOSIT_PAID",
+          note: "پیش‌پرداخت تأیید شد",
+        },
+        {
+          orderId: order.id,
+          fromStatus: "DEPOSIT_PAID",
+          toStatus: "PROCUREMENT_PENDING",
+        },
+      ]);
+    } else {
+      await tx
+        .update(orders)
+        .set({
+          balancePaidToman: input.amountToman,
+          status: "BALANCE_PAID",
+          updatedAt: now,
+        })
+        .where(eq(orders.id, order.id));
+      await tx.insert(orderStatusHistory).values({
         orderId: order.id,
-        fromStatus: "DEPOSIT_PENDING",
-        toStatus: "DEPOSIT_PAID",
-        note: "پیش‌پرداخت تأیید شد",
-      },
-      {
-        orderId: order.id,
-        fromStatus: "DEPOSIT_PAID",
-        toStatus: "PROCUREMENT_PENDING",
-      },
-    ]);
+        fromStatus: "BALANCE_DUE",
+        toStatus: "BALANCE_PAID",
+        note: "مانده سفارش تأیید شد",
+      });
+    }
     await tx.insert(outboxEvents).values({
       aggregateType: "order",
       aggregateId: order.id,
-      eventType: "order.deposit_paid",
+      eventType:
+        payment.type === "DEPOSIT"
+          ? "order.deposit_paid"
+          : "order.balance_paid",
       payload: {
         orderNumber: order.orderNumber,
         amountToman: input.amountToman.toString(),
@@ -640,6 +692,9 @@ export async function completeGatewayDeposit(
     return { payment: updatedPayment!, applied: true };
   });
 }
+
+/** Backward-compatible name for existing callers and older integrations. */
+export const completeGatewayDeposit = completeGatewayPayment;
 
 export async function getOwnedOrder(
   executor: Executor,
@@ -652,15 +707,44 @@ export async function getOwnedOrder(
     .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
     .limit(1);
   if (!order) return null;
-  const [items, paymentRows] = await Promise.all([
-    executor.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
-    executor
-      .select()
-      .from(payments)
-      .where(eq(payments.orderId, order.id))
-      .orderBy(desc(payments.createdAt)),
-  ]);
-  return { order, items, payments: paymentRows };
+  const [items, paymentRows, history, deliveryRows, tripRows] =
+    await Promise.all([
+      executor
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, order.id)),
+      executor
+        .select()
+        .from(payments)
+        .where(eq(payments.orderId, order.id))
+        .orderBy(desc(payments.createdAt)),
+      executor
+        .select()
+        .from(orderStatusHistory)
+        .where(eq(orderStatusHistory.orderId, order.id))
+        .orderBy(orderStatusHistory.createdAt),
+      executor
+        .select()
+        .from(localDeliveries)
+        .where(eq(localDeliveries.orderId, order.id))
+        .orderBy(desc(localDeliveries.createdAt))
+        .limit(1),
+      order.tripId
+        ? executor
+            .select()
+            .from(trips)
+            .where(eq(trips.id, order.tripId))
+            .limit(1)
+        : Promise.resolve([]),
+    ]);
+  return {
+    order,
+    items,
+    payments: paymentRows,
+    history,
+    delivery: deliveryRows[0] ?? null,
+    trip: tripRows[0] ?? null,
+  };
 }
 
 export async function listOwnedOrders(executor: Executor, userId: string) {

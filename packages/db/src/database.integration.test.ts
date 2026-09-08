@@ -17,9 +17,11 @@ import {
   createAdminPricingRule,
   createAdminTrip,
   completeGatewayDeposit,
+  completeGatewayPayment,
   consumeVerificationToken,
   createOrderFromQuote,
   createPaymentIntent,
+  decideOrderReconfirmation,
   ensureActiveCart,
   findOwnedPayment,
   findPaymentByAuthority,
@@ -51,6 +53,7 @@ import {
   listCategoriesWithCounts,
   listOfferPriceHistory,
   listOrderStatusHistory,
+  operateOrderLifecycle,
   listPublishedContent,
   listPublishedProducts,
   listWishlistProducts,
@@ -96,6 +99,7 @@ import {
   purchaseTasks,
   purchaseDocuments,
   purchases,
+  localDeliveries,
   quotes,
   retailers,
   reviews,
@@ -2072,5 +2076,149 @@ describe("checkout repository", () => {
     ).toBeNull();
     expect(await getOwnedOrder(db, order.id, stranger!.id)).toBeNull();
     expect(await getOwnedOrder(db, order.id, fixture.user.id)).not.toBeNull();
+  });
+
+  it("captures the balance idempotently and unlocks local delivery", async () => {
+    const fixture = await createCheckoutFixture();
+    const quote = await persistTestQuote(fixture);
+    const order = await createOrderFromQuote(db, {
+      quoteId: quote.id,
+      userId: fixture.user.id,
+      addressId: fixture.address.id,
+    });
+    await db
+      .update(orders)
+      .set({
+        status: "BALANCE_DUE",
+        depositPaidToman: order.depositRequiredToman,
+      })
+      .where(sql`${orders.id} = ${order.id}`);
+    const payment = await createPaymentIntent(db, {
+      orderId: order.id,
+      type: "BALANCE",
+      method: "GATEWAY",
+      provider: "fake",
+      amountToman: order.balanceDueToman,
+      idempotencyKey: `balance:${order.id}:GATEWAY`,
+    });
+    await setPaymentAuthority(db, {
+      paymentId: payment.id,
+      authority: `FAKE-${payment.id}-balance`,
+    });
+    const input = {
+      authority: `FAKE-${payment.id}-balance`,
+      providerReference: "REF-BALANCE",
+      amountToman: order.balanceDueToman,
+    };
+    await expect(completeGatewayPayment(db, input)).resolves.toMatchObject({
+      applied: true,
+    });
+    await expect(completeGatewayPayment(db, input)).resolves.toMatchObject({
+      applied: false,
+    });
+    const [stored] = await db.select().from(orders);
+    expect(stored?.status).toBe("BALANCE_PAID");
+    expect(stored?.balancePaidToman).toBe(order.balanceDueToman);
+  });
+
+  it("resumes a blocked purchase only after the customer confirms", async () => {
+    const fixture = await createCheckoutFixture();
+    const quote = await persistTestQuote(fixture);
+    const order = await createOrderFromQuote(db, {
+      quoteId: quote.id,
+      userId: fixture.user.id,
+      addressId: fixture.address.id,
+    });
+    const [item] = await db.select().from(orderItems);
+    if (!item) throw new Error("Order item fixture missing");
+    await db
+      .update(orders)
+      .set({ status: "CUSTOMER_RECONFIRMATION_REQUIRED" })
+      .where(sql`${orders.id} = ${order.id}`);
+    await db
+      .update(orderItems)
+      .set({ procurementStatus: "UNAVAILABLE" })
+      .where(sql`${orderItems.id} = ${item.id}`);
+    await db.insert(purchaseTasks).values({
+      orderItemId: item.id,
+      sourceUrl: fixture.offer.sourceUrl,
+      targetMaxPriceEurCents: item.maxSourcePriceEurCents!,
+      status: "BLOCKED",
+      blockedReason: "منبع ناموجود شد",
+    });
+
+    await decideOrderReconfirmation(db, {
+      orderId: order.id,
+      userId: fixture.user.id,
+      decision: "CONTINUE",
+    });
+    expect((await db.select().from(orders))[0]?.status).toBe(
+      "PROCUREMENT_PENDING",
+    );
+    expect((await db.select().from(orderItems))[0]?.procurementStatus).toBe(
+      "PENDING",
+    );
+    expect((await db.select().from(purchaseTasks))[0]?.status).toBe("OPEN");
+  });
+
+  it("completes local delivery and records an audited refund", async () => {
+    const fixture = await createCheckoutFixture();
+    const quote = await persistTestQuote(fixture);
+    const order = await createOrderFromQuote(db, {
+      quoteId: quote.id,
+      userId: fixture.user.id,
+      addressId: fixture.address.id,
+    });
+    const [actor] = await db
+      .insert(users)
+      .values({ email: "lifecycle-owner@example.com", role: "OWNER" })
+      .returning();
+    if (!actor) throw new Error("Lifecycle actor missing");
+    await db
+      .update(orders)
+      .set({
+        status: "BALANCE_PAID",
+        depositPaidToman: order.depositRequiredToman,
+        balancePaidToman: order.balanceDueToman,
+      })
+      .where(sql`${orders.id} = ${order.id}`);
+    await operateOrderLifecycle(db, {
+      orderId: order.id,
+      actorUserId: actor.id,
+      action: "START_LOCAL_DELIVERY",
+    });
+    await operateOrderLifecycle(db, {
+      orderId: order.id,
+      actorUserId: actor.id,
+      action: "DISPATCH_LOCAL",
+      courier: "پست",
+      trackingCode: "TRACK-123",
+    });
+    await operateOrderLifecycle(db, {
+      orderId: order.id,
+      actorUserId: actor.id,
+      action: "DELIVER",
+    });
+    await operateOrderLifecycle(db, {
+      orderId: order.id,
+      actorUserId: actor.id,
+      action: "REQUEST_REFUND",
+      reason: "مرجوعی پس از تحویل",
+    });
+    await operateOrderLifecycle(db, {
+      orderId: order.id,
+      actorUserId: actor.id,
+      action: "COMPLETE_REFUND",
+      refundReference: "REFUND-123",
+    });
+    expect((await db.select().from(orders))[0]?.status).toBe("REFUNDED");
+    expect((await db.select().from(localDeliveries))[0]?.status).toBe(
+      "DELIVERED",
+    );
+    expect(
+      (await db.select().from(payments)).some(
+        (payment) => payment.type === "REFUND",
+      ),
+    ).toBe(true);
   });
 });

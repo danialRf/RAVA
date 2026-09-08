@@ -165,3 +165,22 @@ Until then Codex must use fake/dev adapters behind stable interfaces.
 ## Critical rule
 
 **Never let Codex replace a missing external credential by hardcoding a secret, scraping a private account, bypassing a protection mechanism, or inventing a successful integration.**
+
+## Run the completed local MVP
+
+Open Docker Desktop, wait until its engine is running, then open PowerShell in
+the repository root and run:
+
+```powershell
+pnpm.cmd launch
+```
+
+This single command starts the local infrastructure, applies migrations, builds
+the production application and starts both the website and background worker.
+The storefront and admin then use one fixed address:
+
+`http://localhost:3000`
+
+Keep that PowerShell window open. Press `Ctrl+C` once to stop the website and
+worker; the database containers intentionally remain available for the next run.
+Production launch requirements are listed in `docs/PRODUCTION_CHECKLIST.md`.

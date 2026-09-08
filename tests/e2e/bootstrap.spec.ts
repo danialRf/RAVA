@@ -325,7 +325,9 @@ test("locks a quote, pays the deposit and creates a trackable order", async ({
   await expect(page).toHaveURL(/\/account\/orders\/[0-9a-f-]+\?notice=paid/, {
     timeout: 20_000,
   });
-  await expect(page.getByText("پیش‌پرداخت تأیید شد؛ در صف تهیه")).toBeVisible();
+  await expect(
+    page.getByText("پیش‌پرداخت تأیید شد؛ در صف تهیه").first(),
+  ).toBeVisible();
   await expect(page.getByText("خلاصه مالی")).toBeVisible();
   await page.screenshot({
     path: "docs/phase-5-order-390x844.png",
@@ -627,7 +629,7 @@ test("uploads a card-to-card deposit receipt for review", async ({ page }) => {
   );
 
   // The receipt is only evidence: the order must still be awaiting the deposit.
-  await expect(page.getByText("در انتظار پیش‌پرداخت")).toBeVisible();
+  await expect(page.getByText("در انتظار پیش‌پرداخت").first()).toBeVisible();
   await page.screenshot({
     path: "docs/phase-5-card-receipt-390x844.png",
     fullPage: true,

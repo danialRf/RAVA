@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @rava/web --filter @rava/worker dev",
+    "launch": "node scripts/start-local.mjs",
     "build": "pnpm --recursive --if-present --filter \"@rava/*\" build",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
@@ -19,6 +20,7 @@
     "pretest:e2e": "pnpm --filter @rava/web build",
     "test:e2e": "node scripts/run-e2e.mjs",
     "worker:smoke": "node scripts/smoke-worker.mjs",
+    "check:production": "tsx scripts/check-production-env.ts",
     "db:generate": "pnpm --filter @rava/db db:generate",
     "db:migrate": "pnpm --filter @rava/db db:migrate",
     "db:seed": "pnpm --filter @rava/db db:seed",

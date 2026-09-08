@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { loadEnvironment } from "@rava/config";
-import { completeGatewayDeposit } from "@rava/db";
+import { completeGatewayPayment } from "@rava/db";
 import {
   createPaymentGateway,
   PaymentVerificationError,
@@ -24,12 +24,14 @@ export async function GET(request: Request) {
       status,
       expectedAmountToman: payment.amountToman,
     });
-    await completeGatewayDeposit(database(), verified);
+    await completeGatewayPayment(database(), verified);
   } catch (error) {
     if (error instanceof PaymentVerificationError) {
       redirect(`/account/orders/${payment.orderId}?error=payment`);
     }
     throw error;
   }
-  redirect(`/account/orders/${payment.orderId}?notice=paid`);
+  redirect(
+    `/account/orders/${payment.orderId}?notice=${payment.type === "BALANCE" ? "balance-paid" : "paid"}`,
+  );
 }

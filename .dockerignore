@@ -1,0 +1,11 @@
+.git
+.next
+**/.next
+node_modules
+**/node_modules
+.pnpm-store
+test-results
+playwright-report
+.env
+*.log
+

@@ -42,7 +42,10 @@ export default async function AdminPaymentsPage({
                 </span>
               </div>
               <div>
-                <span className="admin-status">در انتظار بررسی</span>
+                <span className="admin-status">
+                  {payment.type === "BALANCE" ? "تسویه مانده" : "پیش‌پرداخت"}
+                  {" · در انتظار بررسی"}
+                </span>
                 <small>
                   {payment.receiptId ? "رسید ثبت شده" : "رسید ثبت نشده"}
                 </small>
