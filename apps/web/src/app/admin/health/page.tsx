@@ -1,4 +1,11 @@
 import { AdminPageHeader } from "../../../components/admin";
+import {
+  AdminDataTable,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { formatCount } from "../../../lib/format";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 
@@ -12,42 +19,54 @@ export default async function AdminHealthPage() {
         title="Providerها، صف‌ها و استخراج"
         copy="این صفحه فقط وضعیت ثبت‌شده را گزارش می‌کند و هیچ سلامت فرضی تولید نمی‌کند."
       />
-      <section className="admin-metrics">
-        <div>
-          <span>Job ناموفق</span>
-          <strong>{formatCount(health.failedJobs)}</strong>
-        </div>
-        <div>
-          <span>Outbox معطل/ناموفق</span>
-          <strong>{formatCount(health.pendingOutbox)}</strong>
-        </div>
-        <div>
-          <span>Scraper ناقص/ناموفق</span>
-          <strong>{formatCount(health.failedScrapers)}</strong>
-        </div>
-        <div>
-          <span>آخرین نرخ ارز</span>
-          <strong>
-            {health.latestFx
+      <AdminNotice title="نمای وضعیت، نه فرمان اجرا" tone="info">
+        این صفحه تنها مشاهده‌پذیری ثبت‌شده را ارائه می‌کند و هیچ سرویس، صف یا
+        خزنده‌ای را از رابط کاربری اجرا نمی‌کند.
+      </AdminNotice>
+      <AdminStatGrid>
+        <AdminStat
+          label="Job ناموفق"
+          value={formatCount(health.failedJobs)}
+          tone={health.failedJobs ? "danger" : "success"}
+        />
+        <AdminStat
+          label="Outbox معطل/ناموفق"
+          value={formatCount(health.pendingOutbox)}
+          tone={health.pendingOutbox ? "warning" : "success"}
+        />
+        <AdminStat
+          label="Scraper ناقص/ناموفق"
+          value={formatCount(health.failedScrapers)}
+          tone={health.failedScrapers ? "warning" : "success"}
+        />
+        <AdminStat
+          label="آخرین نرخ ارز"
+          value={
+            health.latestFx
               ? health.latestFx.tomanPerUnit.toLocaleString("fa-IR")
-              : "نامعلوم"}
-          </strong>
-          <small>{health.latestFx?.provider ?? "Provider ثبت نشده"}</small>
-        </div>
-      </section>
-      <section className="admin-record-list">
-        {health.retailers.map((s) => (
-          <article className="admin-record static" key={s.id}>
-            <strong>{s.name}</strong>
-            <span>{s.lastHealthStatus ?? "سلامت ثبت نشده"}</span>
-            <small>
-              {s.lastHealthAt
-                ? s.lastHealthAt.toLocaleString("fa-IR")
-                : "زمان بررسی نامعلوم"}
-            </small>
-          </article>
-        ))}
-      </section>
+              : "نامعلوم"
+          }
+          hint={health.latestFx?.provider ?? "Provider ثبت نشده"}
+        />
+      </AdminStatGrid>
+      <AdminDataTable
+        caption="سلامت ثبت‌شده فروشگاه‌ها"
+        columns={[
+          { key: "source", label: "منبع" },
+          { key: "health", label: "سلامت" },
+          { key: "checked", label: "آخرین بررسی" },
+        ]}
+        rows={health.retailers.map((source) => ({
+          id: source.id,
+          cells: {
+            source: source.name,
+            health: <AdminEntityStatus status={source.lastHealthStatus} />,
+            checked: source.lastHealthAt
+              ? source.lastHealthAt.toLocaleString("fa-IR")
+              : "زمان بررسی نامعلوم",
+          },
+        }))}
+      />
     </>
   );
 }

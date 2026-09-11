@@ -11,6 +11,7 @@ Codex must update this file after every phase.
 - PostgreSQL trigram indexes cover Persian/original titles, descriptions and brand names so the launch `ILIKE` search path remains usable as the catalog grows.
 - Storefront and admin use separate App Router layouts without changing public URLs. Admin requests no longer render storefront navigation/footer or query the next shopping trip; the root layout owns only document-level concerns.
 - The admin is a dedicated RTL operations workspace with active navigation, identity and role visibility, store preview/logout controls, actionable queue shortcuts and an honest list of modules that are not built yet.
+- The admin redesign is an incremental presentation-layer upgrade over the existing operations system: its mobile RTL shell, grouped permission-aware navigation, shared status/empty/loading/error states, responsive data tables, operational notices and action surfaces now cover orders, payment review, procurement, trips, catalog, source offers, pricing, customers, requests, content, health and audit. No pricing snapshot, money, order-transition, RBAC, audit, product or supplier-offer domain contract was changed.
 
 ## Current phase
 
@@ -140,6 +141,22 @@ Google OAuth and Telegram are optional post-launch integrations, not launch bloc
 Automated retailer scraping, multi-source deal scoring, marketing-card/Telegram automation, advanced personalization, loyalty/referrals and analytics dashboards were removed from the launch roadmap. They are post-launch investments only if real usage justifies them.
 
 ## Latest verification (2026-09-08)
+
+Admin redesign refactor verification (2026-09-11):
+
+- `pnpm --filter @rava/web exec tsc --noEmit`, `pnpm lint`, `pnpm test:unit` and targeted Prettier verification passed; unit coverage reports 13 files and 92 tests passed.
+- The production Next.js build compiled successfully and finished its TypeScript and page-data stages.
+- The browser suite was started (23 tests) but its complete result could not be collected in this environment because the command runner stops after 30 seconds. Run `pnpm test:e2e` in a normal terminal before release; do not treat this refactor as browser-verified until it completes.
+
+Passed after Phase 1 admin foundation (2026-09-09):
+
+- Reorganized the permission-filtered admin navigation into business-friendly Persian groups while preserving every existing route and permission constant.
+- Added reusable admin tables, filters, status badges, empty/loading/error states, action controls, detail panels and an accessible confirmation dialog.
+- Added an RTL-first responsive admin shell with a desktop sidebar and mobile navigation drawer; no database, domain, query or Server Action changes were made.
+- `pnpm lint`, workspace-wide `pnpm typecheck` and `pnpm test:unit` — 13 files and 92 tests passed.
+- Production build — all existing application and admin routes compiled successfully.
+- `pnpm test:e2e` — all 23 tests passed, including guest/customer RBAC denial and the complete admin workspace at 390 px.
+- Updated mobile admin capture: `docs/phase-6-admin-trips-390x844.png`.
 
 Passed after completing the final launch MVP:
 

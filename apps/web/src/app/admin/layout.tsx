@@ -15,7 +15,7 @@ export default async function AdminLayout({
   const user = await requireAdmin();
   const displayName = user.displayName ?? user.email ?? "همکار روا";
   return (
-    <div className="admin-app">
+    <div className="admin-app" dir="rtl">
       <AdminNavigation user={user} />
       <div className="admin-workspace">
         <AdminTopbar

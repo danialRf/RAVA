@@ -2,6 +2,13 @@ import { formatEurCents, hasAdminPermission } from "@rava/domain";
 import Link from "next/link";
 
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { formatDate } from "../../../lib/format";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { updateProcurementAction } from "../actions";
@@ -24,27 +31,34 @@ export default async function AdminProcurementPage({
         title="صف تدارکات"
         copy="هر ردیف از یک سفارش پرداخت‌شده ساخته شده است؛ مبلغ واقعی و رسید خرید، وضعیت مشتری را به‌روزرسانی می‌کند."
       />
-      <p className="admin-queue-note">
-        قلم جدید از این صفحه اضافه نمی‌شود؛ صف فقط از سفارش قطعی و دارای
-        پیش‌پرداخت ساخته می‌شود تا کالای بدون سفارش وارد عملیات نشود.
-      </p>
-      {params.notice && (
-        <p className="admin-feedback success">{String(params.notice)}</p>
-      )}
-      {params.error && (
-        <p className="admin-feedback error" role="alert">
-          {String(params.error)}
-        </p>
-      )}
+      <AdminNotice title="صف محافظت‌شده" tone="info">
+        قلم جدید از این صفحه اضافه نمی‌شود؛ هر ردیف از سفارش قطعی با پیش‌پرداخت
+        ساخته می‌شود تا عملیات خرید از تعهد مشتری جدا نشود.
+      </AdminNotice>
+      <AdminFlash notice={params.notice} error={params.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="اقلام قابل اقدام"
+          value={items.length.toLocaleString("fa-IR")}
+          hint="صف تهیه آلمان"
+          tone={items.length ? "warning" : "success"}
+        />
+        <AdminStat
+          label="در حال خرید"
+          value={items
+            .filter((item) => item.taskStatus === "IN_PROGRESS")
+            .length.toLocaleString("fa-IR")}
+          hint="اختصاص‌یافته به خریدار"
+          tone="info"
+        />
+      </AdminStatGrid>
       {items.length === 0 ? (
         <AdminEmptyState>کالایی در صف تهیه نیست.</AdminEmptyState>
       ) : (
         <div className="procurement-grid">
           {items.map((item) => (
             <article key={item.id}>
-              <span className="admin-status" dir="ltr">
-                {item.procurementStatus}
-              </span>
+              <AdminEntityStatus status={item.procurementStatus} />
               <h2>{item.productSnapshot.titleFa}</h2>
               <p dir="ltr">
                 {item.productSnapshot.brand} ·{" "}

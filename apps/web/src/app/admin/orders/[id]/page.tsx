@@ -3,6 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminPageHeader } from "../../../../components/admin";
+import {
+  AdminDetailPanel,
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../../lib/admin-status";
 import { formatDate, formatToman } from "../../../../lib/format";
 import {
   orderStatusFa,
@@ -35,11 +43,36 @@ export default async function AdminOrderDetailsPage({
       />
       <div className="admin-order-toolbar">
         <Link href="/admin/orders">بازگشت به سفارش‌ها</Link>
-        <span>{orderStatusFa(result.order.status)}</span>
+        <AdminEntityStatus status={result.order.status}>
+          {orderStatusFa(result.order.status)}
+        </AdminEntityStatus>
         <small>{formatDate(result.order.createdAt)}</small>
       </div>
-      {query.notice && <p className="admin-flash success">{query.notice}</p>}
-      {query.error && <p className="admin-flash error">{query.error}</p>}
+      <AdminFlash notice={query.notice} error={query.error} />
+      <AdminNotice title="رکورد مالی قفل‌شده" tone="warning">
+        مبلغ نهایی، نرخ تبدیل و اقلام این سفارش از snapshot ثبت‌شده خوانده
+        می‌شوند و با تغییرهای بعدی قیمت‌گذاری تغییر نمی‌کنند.
+      </AdminNotice>
+      <AdminStatGrid>
+        <AdminStat
+          label="مبلغ قفل‌شده"
+          value={`${formatToman(result.order.totalLockedToman)} تومان`}
+        />
+        <AdminStat
+          label="پیش‌پرداخت دریافت‌شده"
+          value={`${formatToman(result.order.depositPaidToman)} تومان`}
+          tone="success"
+        />
+        <AdminStat
+          label="مانده"
+          value={`${formatToman(result.order.balanceDueToman - result.order.balancePaidToman)} تومان`}
+          tone={
+            result.order.balanceDueToman > result.order.balancePaidToman
+              ? "warning"
+              : "success"
+          }
+        />
+      </AdminStatGrid>
       {result.order.status === "PURCHASED_GERMANY" && (
         <form
           action={receiveOrderInGermanyAction}
@@ -153,8 +186,10 @@ export default async function AdminOrderDetailsPage({
           </details>
         )}
       <div className="admin-order-detail">
-        <section>
-          <h2>اقلام قفل‌شده سفارش</h2>
+        <AdminDetailPanel
+          title="اقلام قفل‌شده سفارش"
+          description="این اقلام از سفارش قطعی آمده‌اند و با تغییر سبد خرید مشتری عوض نمی‌شوند."
+        >
           <p>
             این اقلام از سفارش قطعی آمده‌اند و با تغییر سبد خرید مشتری عوض
             نمی‌شوند.
@@ -174,7 +209,11 @@ export default async function AdminOrderDetailsPage({
                 </div>
                 <div>
                   <dt>وضعیت تهیه</dt>
-                  <dd>{procurementStatusFa(item.procurementStatus)}</dd>
+                  <dd>
+                    <AdminEntityStatus status={item.procurementStatus}>
+                      {procurementStatusFa(item.procurementStatus)}
+                    </AdminEntityStatus>
+                  </dd>
                 </div>
                 <div>
                   <dt>مبلغ مشتری</dt>
@@ -205,7 +244,7 @@ export default async function AdminOrderDetailsPage({
               )}
             </article>
           ))}
-        </section>
+        </AdminDetailPanel>
         <aside className="admin-money-summary">
           <h2>خلاصه مالی</h2>
           <dl>

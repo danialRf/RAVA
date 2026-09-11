@@ -1,6 +1,11 @@
 import Link from "next/link";
 
 import { AdminPageHeader } from "../../components/admin";
+import {
+  AdminActionButton,
+  AdminActionButtons,
+  AdminDetailPanel,
+} from "../../components/admin-ui";
 import { formatCount, formatToman } from "../../lib/format";
 import { adminQueries, requireAdmin } from "../../server/admin";
 
@@ -39,9 +44,17 @@ export default async function AdminOverviewPage() {
           <span>دسترسی سریع</span>
           <strong>عملیات روزانه</strong>
         </div>
-        <Link href="/admin/payments">بررسی پرداخت‌ها</Link>
-        <Link href="/admin/procurement">ادامه تدارکات</Link>
-        <Link href="/admin/orders">همه سفارش‌ها</Link>
+        <AdminActionButtons>
+          <AdminActionButton href="/admin/payments" tone="primary">
+            بررسی پرداخت‌ها
+          </AdminActionButton>
+          <AdminActionButton href="/admin/procurement">
+            ادامه تأمین
+          </AdminActionButton>
+          <AdminActionButton href="/admin/orders">
+            همه سفارش‌ها
+          </AdminActionButton>
+        </AdminActionButtons>
       </section>
       <div className="admin-metrics">
         {metrics.map(([label, value, href]) => {
@@ -65,19 +78,23 @@ export default async function AdminOverviewPage() {
           );
         })}
       </div>
-      <section className="admin-money-summary">
-        <h2>وضعیت مالی ثبت‌شده</h2>
-        <dl>
-          <div>
-            <dt>پیش‌پرداخت دریافت‌شده</dt>
-            <dd>{formatToman(overview.depositsReceived)} تومان</dd>
-          </div>
-          <div>
-            <dt>مانده حساب سفارش‌های جاری</dt>
-            <dd>{formatToman(overview.outstandingBalances)} تومان</dd>
-          </div>
-        </dl>
-      </section>
+      <AdminDetailPanel
+        title="وضعیت مالی ثبت‌شده"
+        description="مبالغ قطعی ثبت‌شده در سفارش‌های جاری"
+      >
+        <div className="admin-money-summary">
+          <dl>
+            <div>
+              <dt>پیش‌پرداخت دریافت‌شده</dt>
+              <dd>{formatToman(overview.depositsReceived)} تومان</dd>
+            </div>
+            <div>
+              <dt>مانده حساب سفارش‌های جاری</dt>
+              <dd>{formatToman(overview.outstandingBalances)} تومان</dd>
+            </div>
+          </dl>
+        </div>
+      </AdminDetailPanel>
     </>
   );
 }

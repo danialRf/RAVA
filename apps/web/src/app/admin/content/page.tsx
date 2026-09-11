@@ -1,4 +1,11 @@
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { createContentAction, updateContentStatusAction } from "../actions";
 
@@ -20,8 +27,18 @@ export default async function AdminContentPage({
         title="پیش‌نویس، بازبینی و انتشار"
         copy="محتوا نسخه‌دار است و هیچ متن تولیدشده‌ای بدون اقدام صریح اپراتور منتشر نمی‌شود."
       />
-      {q.notice && <p className="admin-flash success">{q.notice}</p>}
-      {q.error && <p className="admin-flash error">{q.error}</p>}
+      <AdminNotice title="انتشار صریح و ممیزی‌شده" tone="info">
+        پیش‌نویس به‌تنهایی منتشر نمی‌شود؛ هر تغییر وضعیت با نقش مجاز و اقدام
+        صریح اپراتور انجام می‌شود.
+      </AdminNotice>
+      <AdminFlash notice={q.notice} error={q.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="رکوردهای محتوا"
+          value={entries.length.toLocaleString("fa-IR")}
+          hint="پیش‌نویس، زمان‌بندی و انتشار"
+        />
+      </AdminStatGrid>
       {writable && (
         <details className="admin-create-panel">
           <summary>ساخت پیش‌نویس</summary>
@@ -54,7 +71,7 @@ export default async function AdminContentPage({
                   {e.key} · v{e.version}
                 </small>
               </div>
-              <mark>{e.status}</mark>
+              <AdminEntityStatus status={e.status} />
               <form action={updateContentStatusAction}>
                 <input type="hidden" name="id" value={e.id} />
                 <select name="status" defaultValue={e.status}>

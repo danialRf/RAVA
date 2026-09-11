@@ -1,4 +1,10 @@
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
 import { formatToman } from "../../../lib/format";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { createPricingRuleAction } from "../actions";
@@ -21,8 +27,18 @@ export default async function AdminPricingPage({
         title="عامل‌های شفاف قیمت نهایی"
         copy="نرخ ارز از Provider می‌آید و در این فرم قابل دستکاری نیست؛ هر قانون جدید ممیزی می‌شود."
       />
-      {query.notice && <p className="admin-flash success">{query.notice}</p>}
-      {query.error && <p className="admin-flash error">{query.error}</p>}
+      <AdminNotice title="قیمت قطعیِ قابل ردگیری" tone="warning">
+        قانون جدید فقط بر محاسبات جدید اثر می‌گذارد؛ نقل‌قول‌ها و سفارش‌های
+        قفل‌شده با snapshot خود باقی می‌مانند.
+      </AdminNotice>
+      <AdminFlash notice={query.notice} error={query.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="قانون فعال/ثبت‌شده"
+          value={rules.length.toLocaleString("fa-IR")}
+          hint="اولویت و دامنه در هر ردیف مشخص است"
+        />
+      </AdminStatGrid>
       {writable && (
         <details className="admin-create-panel">
           <summary>افزودن قانون سراسری</summary>

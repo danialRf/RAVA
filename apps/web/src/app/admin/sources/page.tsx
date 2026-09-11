@@ -1,4 +1,11 @@
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { updateRetailerAction } from "../actions";
 
@@ -20,8 +27,26 @@ export default async function AdminSourcesPage({
         title="فروشگاه‌ها و سیاست اعتماد"
         copy="فعال‌سازی خزیدن به‌تنهایی منبع را تأیید نمی‌کند؛ سطح اعتماد و سلامت جدا ثبت می‌شوند."
       />
-      {q.notice && <p className="admin-flash success">{q.notice}</p>}
-      {q.error && <p className="admin-flash error">{q.error}</p>}
+      <AdminNotice title="سیاست منبع، نه ادعای اصالت" tone="warning">
+        سطح اعتماد، اجازه خزیدن و سلامت ثبت‌شده مستقل‌اند. تغییر آن‌ها در مسیر
+        ممیزی باقی می‌ماند.
+      </AdminNotice>
+      <AdminFlash notice={q.notice} error={q.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="منابع ثبت‌شده"
+          value={sources.length.toLocaleString("fa-IR")}
+          hint="فروشگاه‌ها و سیاست‌های آن‌ها"
+        />
+        <AdminStat
+          label="خزیدن فعال"
+          value={sources
+            .filter((source) => source.isEnabled)
+            .length.toLocaleString("fa-IR")}
+          tone="info"
+          hint="با رعایت سیاست منبع"
+        />
+      </AdminStatGrid>
       {sources.length === 0 ? (
         <AdminEmptyState>منبعی ثبت نشده است.</AdminEmptyState>
       ) : (
@@ -33,9 +58,9 @@ export default async function AdminSourcesPage({
                   <strong>{s.name}</strong>
                   <small dir="ltr">{s.domain}</small>
                 </span>
-                <mark>{s.trustTier}</mark>
+                <AdminEntityStatus status={s.trustTier} />
                 <span>{s.offerCount} پیشنهاد</span>
-                <span>{s.lastHealthStatus ?? "سلامت نامعلوم"}</span>
+                <AdminEntityStatus status={s.lastHealthStatus} />
               </summary>
               <form action={updateRetailerAction} className="admin-form-grid">
                 <input type="hidden" name="id" value={s.id} />

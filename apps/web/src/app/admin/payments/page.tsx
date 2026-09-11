@@ -2,6 +2,14 @@ import { hasAdminPermission } from "@rava/domain";
 import Link from "next/link";
 
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminDataTable,
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { formatDate, formatToman } from "../../../lib/format";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { reviewCardPaymentAction } from "../actions";
@@ -19,51 +27,65 @@ export default async function AdminPaymentsPage({
         title="پرداخت‌های نیازمند بررسی"
         copy="رسید فقط مدرک ادعاست؛ تا زمان تأیید مالی، مبلغ به سفارش منظور نمی‌شود."
       />
-      {params.notice && (
-        <p className="admin-feedback success">{String(params.notice)}</p>
-      )}
-      {params.error && (
-        <p className="admin-feedback error" role="alert">
-          {String(params.error)}
-        </p>
-      )}
+      <AdminFlash notice={params.notice} error={params.error} />
+      <AdminNotice title="کنترل دو مرحله‌ای پرداخت" tone="warning">
+        تأیید یا رد پرداخت فقط با دلیل ثبت‌شده انجام می‌شود و در سابقه ممیزی
+        باقی می‌ماند.
+      </AdminNotice>
+      <AdminStatGrid>
+        <AdminStat
+          label="صف بررسی"
+          value={payments.length.toLocaleString("fa-IR")}
+          hint="رسیدهای منتظر تصمیم"
+          tone={payments.length ? "warning" : "success"}
+        />
+      </AdminStatGrid>
       {payments.length === 0 ? (
         <AdminEmptyState>پرداختی در انتظار بررسی نیست.</AdminEmptyState>
       ) : (
-        <div className="admin-list">
-          {payments.map((payment) => (
-            <article key={payment.id}>
-              <div>
-                <strong dir="ltr">{payment.orderNumber}</strong>
-                <span>
-                  {payment.customerName ??
-                    payment.customerEmail ??
-                    "مشتری بدون نام"}
-                </span>
-              </div>
-              <div>
-                <span className="admin-status">
-                  {payment.type === "BALANCE" ? "تسویه مانده" : "پیش‌پرداخت"}
-                  {" · در انتظار بررسی"}
-                </span>
-                <small>
-                  {payment.receiptId ? "رسید ثبت شده" : "رسید ثبت نشده"}
-                </small>
-                {payment.receiptId && (
-                  <Link
-                    className="admin-receipt-link"
-                    href={`/admin/payments/receipt/${payment.receiptId}`}
-                    target="_blank"
-                  >
-                    مشاهده امن رسید
-                  </Link>
-                )}
-              </div>
-              <div>
-                <strong>{formatToman(payment.amountToman)} تومان</strong>
-                <small>{formatDate(payment.createdAt)}</small>
-              </div>
-              {hasAdminPermission(user.role, "PAYMENTS_REVIEW") && (
+        <AdminDataTable
+          caption="پرداخت‌های نیازمند بررسی"
+          columns={[
+            { key: "order", label: "سفارش" },
+            { key: "customer", label: "مشتری" },
+            { key: "type", label: "نوع و رسید" },
+            { key: "amount", label: "مبلغ", align: "end" },
+            { key: "action", label: "تصمیم" },
+          ]}
+          rows={payments.map((payment) => ({
+            id: payment.id,
+            cells: {
+              order: <strong dir="ltr">{payment.orderNumber}</strong>,
+              customer:
+                payment.customerName ??
+                payment.customerEmail ??
+                "مشتری بدون نام",
+              type: (
+                <>
+                  <AdminEntityStatus status="PENDING_VERIFICATION">
+                    {payment.type === "BALANCE" ? "تسویه مانده" : "پیش‌پرداخت"}
+                  </AdminEntityStatus>
+                  <small>
+                    {payment.receiptId ? "رسید ثبت شده" : "رسید ثبت نشده"}
+                  </small>
+                  {payment.receiptId && (
+                    <Link
+                      className="admin-receipt-link"
+                      href={`/admin/payments/receipt/${payment.receiptId}`}
+                      target="_blank"
+                    >
+                      مشاهده امن رسید
+                    </Link>
+                  )}
+                </>
+              ),
+              amount: (
+                <>
+                  <strong>{formatToman(payment.amountToman)} تومان</strong>
+                  <small>{formatDate(payment.createdAt)}</small>
+                </>
+              ),
+              action: hasAdminPermission(user.role, "PAYMENTS_REVIEW") ? (
                 <form
                   className="admin-review-form"
                   action={reviewCardPaymentAction}
@@ -85,21 +107,23 @@ export default async function AdminPaymentsPage({
                       value="APPROVE"
                       className="button primary"
                     >
-                      تأیید پرداخت
+                      تأیید
                     </button>
                     <button
                       name="decision"
                       value="REJECT"
                       className="button danger"
                     >
-                      رد پرداخت
+                      رد
                     </button>
                   </div>
                 </form>
-              )}
-            </article>
-          ))}
-        </div>
+              ) : (
+                "فقط مشاهده"
+              ),
+            },
+          }))}
+        />
       )}
     </>
   );

@@ -1,4 +1,11 @@
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import {
   assignOrderToTripAction,
@@ -35,8 +42,29 @@ export default async function AdminTripsPage({
         title="ظرفیت حمل آلمان تا ایران"
         copy="سفر، پنجره زمانی و ظرفیت را ثبت کنید؛ وزن نامعلوم به‌عنوان ظرفیت آزاد فرض نمی‌شود."
       />
-      {query.notice && <p className="admin-flash success">{query.notice}</p>}
-      {query.error && <p className="admin-flash error">{query.error}</p>}
+      <AdminNotice title="ظرفیت محافظه‌کارانه" tone="warning">
+        وزن نامعلوم ظرفیت آزاد تلقی نمی‌شود. تنها سفرهای برنامه‌ریزی‌شده یا در
+        حال جمع‌آوری، سفارش جدید می‌پذیرند.
+      </AdminNotice>
+      <AdminFlash notice={query.notice} error={query.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="سفرهای فعال"
+          value={trips
+            .filter(
+              (trip) => !["DISTRIBUTED", "CANCELLED"].includes(trip.status),
+            )
+            .length.toLocaleString("fa-IR")}
+          hint="در چرخه حمل"
+          tone="info"
+        />
+        <AdminStat
+          label="سفارش منتظر تخصیص"
+          value={awaitingOrders.length.toLocaleString("fa-IR")}
+          hint="پس از دریافت در آلمان"
+          tone={awaitingOrders.length ? "warning" : "success"}
+        />
+      </AdminStatGrid>
       {writable && (
         <details className="admin-create-panel">
           <summary>ساخت سفر</summary>
@@ -91,7 +119,9 @@ export default async function AdminTripsPage({
                 {t.itemCount} قلم · {t.assignedWeightGrams} از{" "}
                 {t.capacityWeightGrams ?? "نامعلوم"} گرم
               </span>
-              <span className="admin-status">{TRIP_STATUS_FA[t.status]}</span>
+              <AdminEntityStatus status={t.status}>
+                {TRIP_STATUS_FA[t.status]}
+              </AdminEntityStatus>
               <form action={updateTripStatusAction}>
                 <input type="hidden" name="id" value={t.id} />
                 <select name="status" defaultValue="" required>

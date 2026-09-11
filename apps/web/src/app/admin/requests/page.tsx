@@ -1,4 +1,11 @@
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { formatToman } from "../../../lib/format";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { updateProductRequestAction } from "../actions";
@@ -21,8 +28,23 @@ export default async function AdminRequestsPage({
         title="صف تحقیق و پاسخ به مشتری"
         copy="بودجه و لینک فقط داده مشتری‌اند؛ تا بررسی منبع، قیمت یا موجودی تأیید نمی‌شود."
       />
-      {q.notice && <p className="admin-flash success">{q.notice}</p>}
-      {q.error && <p className="admin-flash error">{q.error}</p>}
+      <AdminNotice title="درخواست، تعهد قیمت نیست" tone="info">
+        تا زمانی که منبع و قیمت بررسی نشده‌اند، بودجه و لینک صرفاً اطلاعات
+        ارائه‌شده توسط مشتری هستند.
+      </AdminNotice>
+      <AdminFlash notice={q.notice} error={q.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="درخواست‌های باز"
+          value={requests
+            .filter(
+              (request) => !["FULFILLED", "DECLINED"].includes(request.status),
+            )
+            .length.toLocaleString("fa-IR")}
+          tone="warning"
+          hint="در انتظار پاسخ یا بررسی"
+        />
+      </AdminStatGrid>
       {requests.length === 0 ? (
         <AdminEmptyState>درخواست بازی وجود ندارد.</AdminEmptyState>
       ) : (
@@ -58,6 +80,7 @@ export default async function AdminRequestsPage({
                 </select>
                 <button disabled={!writable}>ثبت وضعیت</button>
               </form>
+              <AdminEntityStatus status={r.status} />
             </article>
           ))}
         </section>

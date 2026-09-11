@@ -1,4 +1,11 @@
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { updateProductAction } from "../actions";
 
@@ -19,8 +26,26 @@ export default async function AdminCatalogPage({
         title="محصولات و وضعیت انتشار"
         copy="فقط واقعیت‌های ثبت‌شده را ویرایش کنید؛ اطلاعات نامعلوم باید خالی بماند."
       />
-      {query.notice && <p className="admin-flash success">{query.notice}</p>}
-      {query.error && <p className="admin-flash error">{query.error}</p>}
+      <AdminNotice title="مرز محصول و پیشنهاد" tone="info">
+        ویرایش محصول، حقیقت منبع را تغییر نمی‌دهد. قیمت، موجودی و فروشگاه در
+        پیشنهاد تأمین جداگانه نگهداری می‌شوند.
+      </AdminNotice>
+      <AdminFlash notice={query.notice} error={query.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="محصولات"
+          value={items.length.toLocaleString("fa-IR")}
+          hint="رکوردهای کاتالوگ"
+        />
+        <AdminStat
+          label="نیازمند بازبینی"
+          value={items
+            .filter((item) => item.status === "NEEDS_REVIEW")
+            .length.toLocaleString("fa-IR")}
+          tone="warning"
+          hint="پیش از انتشار بررسی شود"
+        />
+      </AdminStatGrid>
       {items.length === 0 ? (
         <AdminEmptyState>هنوز محصولی ثبت نشده است.</AdminEmptyState>
       ) : (
@@ -38,7 +63,7 @@ export default async function AdminCatalogPage({
                 <span>
                   {item.variantCount} تنوع · {item.offerCount} پیشنهاد
                 </span>
-                <mark>{item.status}</mark>
+                <AdminEntityStatus status={item.status} />
               </summary>
               <form action={updateProductAction} className="admin-form-grid">
                 <input type="hidden" name="id" value={item.id} />

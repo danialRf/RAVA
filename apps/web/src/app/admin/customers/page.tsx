@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import { AdminStat, AdminStatGrid } from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { formatToman } from "../../../lib/format";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 
@@ -13,6 +15,13 @@ export default async function AdminCustomersPage() {
         title="نمای عملیاتی مشتریان"
         copy="فقط اطلاعات تماس، سفارش و مبلغ پرداخت‌شده نمایش داده می‌شود؛ پروفایل‌سازی غیرضروری انجام نمی‌دهیم."
       />
+      <AdminStatGrid>
+        <AdminStat
+          label="مشتریان"
+          value={customers.length.toLocaleString("fa-IR")}
+          hint="فقط داده عملیاتی ضروری"
+        />
+      </AdminStatGrid>
       {customers.length === 0 ? (
         <AdminEmptyState>مشتری ثبت‌شده‌ای وجود ندارد.</AdminEmptyState>
       ) : (
@@ -23,7 +32,7 @@ export default async function AdminCustomersPage() {
                 <strong>{c.displayName ?? "بدون نام"}</strong>
                 <small dir="ltr">{c.email ?? c.phoneE164 ?? "—"}</small>
               </div>
-              <mark>{c.status}</mark>
+              <AdminEntityStatus status={c.status} />
               <span>{c.orderCount} سفارش</span>
               <span>{formatToman(c.totalPaidToman)} تومان پرداخت‌شده</span>
               <Link href={`/admin/orders?customer=${c.id}`}>سفارش‌ها</Link>

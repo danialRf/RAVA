@@ -1,4 +1,11 @@
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import {
+  AdminFlash,
+  AdminNotice,
+  AdminStat,
+  AdminStatGrid,
+} from "../../../components/admin-ui";
+import { AdminEntityStatus } from "../../../lib/admin-status";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import { reviewOfferAction } from "../actions";
 
@@ -19,8 +26,26 @@ export default async function AdminOffersPage({
         title="تطبیق و تأیید پیشنهادها"
         copy="پیشنهاد بدون اتصال به تنوع محصول هرگز قابل فروش یا تأیید نیست."
       />
-      {query.notice && <p className="admin-flash success">{query.notice}</p>}
-      {query.error && <p className="admin-flash error">{query.error}</p>}
+      <AdminNotice title="حقیقتِ منبع" tone="warning">
+        تأیید منبع فقط برای پیشنهاد متصل به تنوع محصول ممکن است؛ این کنترل جای
+        بررسی فروشنده یا سیاست تأمین را نمی‌گیرد.
+      </AdminNotice>
+      <AdminFlash notice={query.notice} error={query.error} />
+      <AdminStatGrid>
+        <AdminStat
+          label="پیشنهادها"
+          value={offers.length.toLocaleString("fa-IR")}
+          hint="داده‌های عرضه‌کننده"
+        />
+        <AdminStat
+          label="تأییدنشده"
+          value={offers
+            .filter((offer) => !offer.sourceVerified)
+            .length.toLocaleString("fa-IR")}
+          tone="warning"
+          hint="نیازمند بررسی منبع"
+        />
+      </AdminStatGrid>
       {offers.length === 0 ? (
         <AdminEmptyState>پیشنهادی ثبت نشده است.</AdminEmptyState>
       ) : (
@@ -37,7 +62,7 @@ export default async function AdminOffersPage({
                 <b dir="ltr">
                   € {(Number(o.sourcePriceEurCents) / 100).toFixed(2)}
                 </b>
-                <span>{o.stockStatus}</span>
+                <AdminEntityStatus status={o.stockStatus} />
               </div>
               <a href={o.sourceUrl} target="_blank" rel="noreferrer">
                 مشاهده منبع
@@ -49,7 +74,13 @@ export default async function AdminOffersPage({
                   name="sourceVerified"
                   value={o.sourceVerified ? "false" : "true"}
                 />
-                <button>{o.sourceVerified ? "لغو تأیید" : "تأیید منبع"}</button>
+                <button
+                  className={
+                    o.sourceVerified ? "button secondary" : "button primary"
+                  }
+                >
+                  {o.sourceVerified ? "لغو تأیید" : "تأیید منبع"}
+                </button>
               </form>
             </article>
           ))}
