@@ -12,6 +12,8 @@ Codex must update this file after every phase.
 - Storefront and admin use separate App Router layouts without changing public URLs. Admin requests no longer render storefront navigation/footer or query the next shopping trip; the root layout owns only document-level concerns.
 - The admin is a dedicated RTL operations workspace with active navigation, identity and role visibility, store preview/logout controls, actionable queue shortcuts and an honest list of modules that are not built yet.
 - The admin redesign is an incremental presentation-layer upgrade over the existing operations system: its mobile RTL shell, grouped permission-aware navigation, shared status/empty/loading/error states, responsive data tables, operational notices and action surfaces now cover orders, payment review, procurement, trips, catalog, source offers, pricing, customers, requests, content, health and audit. No pricing snapshot, money, order-transition, RBAC, audit, product or supplier-offer domain contract was changed.
+- Product administration now follows a conventional commerce workflow: staff can create a draft product with brand, category, initial variant/SKU, weight, transport class, description and a validated public product image; edit and replace its core presentation; preview it; publish it; or archive it without damaging historical orders. Source links and pricing remain available under clearly labelled advanced settings instead of dominating the everyday catalog flow.
+- Source management now supports audited creation and full policy editing of German retailers plus safe deactivation. Offer management supports audited manual creation, variant/retailer linking, EUR-cent-safe price and stock editing, re-verification and archival. Archival removes records from future selling without deleting historical relationships; editing an offer clears verification until a staff member reviews it again, and the offer URL must match its retailer domain.
 
 ## Current phase
 
@@ -141,6 +143,14 @@ Google OAuth and Telegram are optional post-launch integrations, not launch bloc
 Automated retailer scraping, multi-source deal scoring, marketing-card/Telegram automation, advanced personalization, loyalty/referrals and analytics dashboards were removed from the launch roadmap. They are post-launch investments only if real usage justifies them.
 
 ## Latest verification (2026-09-08)
+
+Simple commerce admin and product CRUD verification (2026-09-12):
+
+- Reframed the everyday admin around products, orders, customers, payments, purchasing and shipping; German retailer links and pricing configuration remain available as advanced settings.
+- Added audited product creation with brand/category selection, an initial SKU/variant, validated public JPG/PNG/WebP upload, editing, image replacement, storefront preview, publication and safe archival.
+- Added full manual CRUD/archive workflows for German retailers and purchase links while preserving retailer-domain validation, offer re-review after edits and integer EUR cents.
+- `pnpm lint`, workspace-wide `pnpm typecheck`, and `pnpm test` passed: 14 files and 168 tests, including the new product and source-management integration coverage.
+- Production build passed and all 23 Playwright tests passed, including the complete admin workspace at 390 px.
 
 Admin redesign refactor verification (2026-09-11):
 

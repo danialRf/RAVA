@@ -16,42 +16,34 @@ const NAVIGATION: ReadonlyArray<{
 }> = [
   { items: [["داشبورد", "/admin", "OVERVIEW_READ", "home"]] },
   {
-    label: "فروش",
+    label: "فروشگاه",
     items: [
       ["سفارش‌ها", "/admin/orders", "ORDERS_READ", "orders"],
-      ["پرداخت‌ها", "/admin/payments", "PAYMENTS_READ", "payment"],
-      ["مشتریان", "/admin/customers", "CUSTOMERS_READ", "customers"],
-    ],
-  },
-  {
-    label: "محصولات",
-    items: [
       ["محصولات", "/admin/catalog", "CATALOG_READ", "products"],
+      ["مشتریان", "/admin/customers", "CUSTOMERS_READ", "customers"],
+      ["پرداخت‌ها", "/admin/payments", "PAYMENTS_READ", "payment"],
       ["درخواست‌های محصول", "/admin/requests", "REQUESTS_READ", "requests"],
     ],
   },
   {
-    label: "تأمین از آلمان",
+    label: "خرید و ارسال",
     items: [
-      ["فروشگاه‌ها و فروشندگان", "/admin/sources", "SOURCES_READ", "store"],
-      ["پیشنهادهای تأمین", "/admin/offers", "CATALOG_READ", "offers"],
-      ["خریدهای در انتظار", "/admin/procurement", "PROCUREMENT_READ", "truck"],
+      ["خریدهای آلمان", "/admin/procurement", "PROCUREMENT_READ", "truck"],
       ["سفرها و حمل", "/admin/trips", "TRIPS_READ", "trips"],
     ],
   },
   {
-    label: "مالی",
-    items: [["قیمت‌گذاری", "/admin/pricing", "PRICING_READ", "pricing"]],
-  },
-  {
-    label: "مدیریت فروشگاه",
+    label: "سایت",
     items: [["محتوا", "/admin/content", "CONTENT_READ", "content"]],
   },
   {
-    label: "تنظیمات",
+    label: "تنظیمات پیشرفته",
     items: [
+      ["قیمت و موجودی خرید", "/admin/offers", "CATALOG_READ", "offers"],
+      ["فروشگاه‌های آلمان", "/admin/sources", "SOURCES_READ", "store"],
+      ["قوانین قیمت‌گذاری", "/admin/pricing", "PRICING_READ", "pricing"],
       ["وضعیت سرویس‌ها", "/admin/health", "HEALTH_READ", "health"],
-      ["سابقه فعالیت مدیران", "/admin/audit", "AUDIT_READ", "history"],
+      ["گزارش فعالیت‌ها", "/admin/audit", "AUDIT_READ", "history"],
     ],
   },
 ];

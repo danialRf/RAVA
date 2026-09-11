@@ -8,14 +8,19 @@ import { eq, inArray } from "drizzle-orm";
 import type { Database } from "../client";
 import {
   adminAuditLog,
+  brands,
+  categories,
   contentEntries,
   orderItems,
   orders,
   orderStatusHistory,
+  offerPriceHistory,
   outboxEvents,
   pricingRules,
   productRequests,
   products,
+  productMedia,
+  productVariants,
   retailers,
   sourceOffers,
   trips,
@@ -57,10 +62,15 @@ export async function updateAdminProduct(
     id: string;
     actorUserId: string;
     titleFa: string;
+    titleOriginal?: string;
+    brandId?: string;
+    categoryId?: string;
     descriptionFa: string | null;
     status: "DRAFT" | "NEEDS_REVIEW" | "PUBLISHED" | "ARCHIVED";
     weightGrams: number | null;
     transportClass: "XS" | "S" | "M" | "L" | "BLOCKED" | null;
+    imageUrl?: string | null;
+    imageAlt?: string | null;
   },
 ) {
   const title = input.titleFa.trim();
@@ -77,6 +87,9 @@ export async function updateAdminProduct(
     if (!before) throw new AdminOperationError("PRODUCT_NOT_FOUND");
     const after = {
       titleFa: title,
+      titleOriginal: input.titleOriginal?.trim() || before.titleOriginal,
+      brandId: input.brandId ?? before.brandId,
+      categoryId: input.categoryId ?? before.categoryId,
       descriptionFa: input.descriptionFa?.trim() || null,
       status: input.status,
       weightGrams: input.weightGrams,
@@ -88,10 +101,151 @@ export async function updateAdminProduct(
       updatedAt: new Date(),
     };
     await tx.update(products).set(after).where(eq(products.id, input.id));
+    if (input.imageUrl) {
+      await tx
+        .update(productMedia)
+        .set({ kind: "GALLERY" })
+        .where(eq(productMedia.productId, input.id));
+      await tx.insert(productMedia).values({
+        productId: input.id,
+        kind: "PRIMARY",
+        sourceUrl: input.imageUrl,
+        altTextFa: input.imageAlt?.trim() || title,
+        sourceAttribution: "بارگذاری مستقیم مدیر فروشگاه",
+        rightsNotes: "مسئولیت حق استفاده از تصویر با مدیر بارگذار است.",
+      });
+    }
     await audit(
       tx,
       input.actorUserId,
       "catalog.product_updated",
+      "product",
+      input.id,
+      before,
+      after,
+    );
+  });
+}
+
+function productSlug(value: string) {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-|-$/g, "");
+  return normalized || `product-${Date.now()}`;
+}
+
+export async function createAdminProduct(
+  db: Database,
+  input: {
+    actorUserId: string;
+    brandId: string;
+    categoryId: string;
+    titleFa: string;
+    titleOriginal: string;
+    descriptionFa: string | null;
+    weightGrams: number | null;
+    transportClass: "XS" | "S" | "M" | "L" | "BLOCKED" | null;
+    skuInternal: string;
+    size: string | null;
+    color: string | null;
+    imageUrl: string | null;
+    imageAlt: string | null;
+  },
+) {
+  const titleFa = input.titleFa.trim();
+  const titleOriginal = input.titleOriginal.trim();
+  const sku = input.skuInternal.trim().toUpperCase();
+  if (
+    titleFa.length < 2 ||
+    titleOriginal.length < 2 ||
+    sku.length < 2 ||
+    (input.weightGrams ?? 1) <= 0
+  )
+    throw new AdminOperationError("PRODUCT_INPUT_INVALID");
+
+  return db.transaction(async (tx) => {
+    const [brand, category] = await Promise.all([
+      tx
+        .select({ id: brands.id })
+        .from(brands)
+        .where(eq(brands.id, input.brandId))
+        .limit(1),
+      tx
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.id, input.categoryId))
+        .limit(1),
+    ]);
+    if (!brand[0] || !category[0])
+      throw new AdminOperationError("PRODUCT_INPUT_INVALID");
+    const [created] = await tx
+      .insert(products)
+      .values({
+        brandId: input.brandId,
+        categoryId: input.categoryId,
+        titleFa,
+        titleOriginal,
+        slug: `${productSlug(titleOriginal)}-${Date.now().toString(36)}`,
+        descriptionFa: input.descriptionFa?.trim() || null,
+        weightGrams: input.weightGrams,
+        transportClass: input.transportClass,
+        status: "DRAFT",
+      })
+      .returning();
+    if (!created) throw new AdminOperationError("PRODUCT_NOT_CREATED");
+    await tx.insert(productVariants).values({
+      productId: created.id,
+      skuInternal: sku,
+      size: input.size?.trim() || null,
+      color: input.color?.trim() || null,
+    });
+    if (input.imageUrl)
+      await tx.insert(productMedia).values({
+        productId: created.id,
+        kind: "PRIMARY",
+        sourceUrl: input.imageUrl,
+        altTextFa: input.imageAlt?.trim() || titleFa,
+        sourceAttribution: "بارگذاری مستقیم مدیر فروشگاه",
+        rightsNotes: "مسئولیت حق استفاده از تصویر با مدیر بارگذار است.",
+      });
+    await audit(
+      tx,
+      input.actorUserId,
+      "catalog.product_created",
+      "product",
+      created.id,
+      null,
+      created,
+    );
+    return created;
+  });
+}
+
+export async function archiveAdminProduct(
+  db: Database,
+  input: { id: string; actorUserId: string },
+) {
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(products)
+      .where(eq(products.id, input.id))
+      .for("update")
+      .limit(1);
+    if (!before) throw new AdminOperationError("PRODUCT_NOT_FOUND");
+    const after = {
+      status: "ARCHIVED" as const,
+      publishedAt: null,
+      updatedAt: new Date(),
+    };
+    await tx.update(products).set(after).where(eq(products.id, input.id));
+    await audit(
+      tx,
+      input.actorUserId,
+      "catalog.product_archived",
       "product",
       input.id,
       before,
@@ -115,6 +269,21 @@ export async function reviewAdminOffer(
     if (input.sourceVerified && before.productVariantId === null) {
       throw new AdminOperationError("UNMATCHED_OFFER_CANNOT_BE_VERIFIED");
     }
+    if (input.sourceVerified) {
+      const [retailer] = await tx
+        .select()
+        .from(retailers)
+        .where(eq(retailers.id, before.retailerId))
+        .limit(1);
+      if (
+        !retailer?.isEnabled ||
+        retailer.trustTier === "UNVERIFIED" ||
+        (retailer.trustTier === "TRUSTED_MARKETPLACE" &&
+          before.sellerId === null)
+      ) {
+        throw new AdminOperationError("OFFER_SOURCE_POLICY_NOT_SATISFIED");
+      }
+    }
     const after = {
       sourceVerified: input.sourceVerified,
       updatedAt: new Date(),
@@ -130,6 +299,183 @@ export async function reviewAdminOffer(
       "source_offer",
       input.id,
       { sourceVerified: before.sourceVerified },
+      after,
+    );
+  });
+}
+
+type AdminOfferInput = {
+  actorUserId: string;
+  retailerId: string;
+  productVariantId: string;
+  sourceUrl: string;
+  rawTitle: string;
+  sourcePriceEurCents: bigint;
+  shippingEurCents: bigint | null;
+  stockStatus:
+    "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "PREORDER" | "UNKNOWN";
+};
+
+function validateAdminOffer(input: AdminOfferInput) {
+  const title = input.rawTitle.trim();
+  let url: URL;
+  try {
+    url = new URL(input.sourceUrl);
+  } catch {
+    throw new AdminOperationError("OFFER_URL_INVALID");
+  }
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    title.length < 2 ||
+    title.length > 300 ||
+    input.sourcePriceEurCents <= 0n ||
+    (input.shippingEurCents !== null && input.shippingEurCents < 0n)
+  )
+    throw new AdminOperationError("OFFER_INPUT_INVALID");
+  return { title, url: url.toString(), hostname: url.hostname.toLowerCase() };
+}
+
+async function assertOfferSourceDomain(
+  tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
+  retailerId: string,
+  hostname: string,
+) {
+  const [retailer] = await tx
+    .select({ domain: retailers.domain })
+    .from(retailers)
+    .where(eq(retailers.id, retailerId))
+    .limit(1);
+  if (!retailer) throw new AdminOperationError("RETAILER_NOT_FOUND");
+  const domain = retailer.domain.toLowerCase();
+  if (hostname !== domain && !hostname.endsWith(`.${domain}`))
+    throw new AdminOperationError("OFFER_RETAILER_DOMAIN_MISMATCH");
+}
+
+export async function createAdminOffer(db: Database, input: AdminOfferInput) {
+  const normalized = validateAdminOffer(input);
+  return db.transaction(async (tx) => {
+    await assertOfferSourceDomain(tx, input.retailerId, normalized.hostname);
+    const [created] = await tx
+      .insert(sourceOffers)
+      .values({
+        retailerId: input.retailerId,
+        productVariantId: input.productVariantId,
+        sourceUrl: normalized.url,
+        rawTitle: normalized.title,
+        sourcePriceEurCents: input.sourcePriceEurCents,
+        shippingEurCents: input.shippingEurCents,
+        stockStatus: input.stockStatus,
+        sourceVerified: false,
+      })
+      .returning();
+    if (!created) throw new AdminOperationError("OFFER_NOT_CREATED");
+    await tx.insert(offerPriceHistory).values({
+      offerId: created.id,
+      priceEurCents: created.sourcePriceEurCents,
+      shippingEurCents: created.shippingEurCents,
+      stockStatus: created.stockStatus,
+    });
+    await audit(
+      tx,
+      input.actorUserId,
+      "catalog.offer_created",
+      "source_offer",
+      created.id,
+      null,
+      created,
+    );
+    return created;
+  });
+}
+
+export async function updateAdminOffer(
+  db: Database,
+  input: AdminOfferInput & { id: string },
+) {
+  const normalized = validateAdminOffer(input);
+  return db.transaction(async (tx) => {
+    await assertOfferSourceDomain(tx, input.retailerId, normalized.hostname);
+    const [before] = await tx
+      .select()
+      .from(sourceOffers)
+      .where(eq(sourceOffers.id, input.id))
+      .for("update")
+      .limit(1);
+    if (!before) throw new AdminOperationError("OFFER_NOT_FOUND");
+    const after = {
+      retailerId: input.retailerId,
+      productVariantId: input.productVariantId,
+      sourceUrl: normalized.url,
+      rawTitle: normalized.title,
+      previousPriceEurCents:
+        before.sourcePriceEurCents === input.sourcePriceEurCents
+          ? before.previousPriceEurCents
+          : before.sourcePriceEurCents,
+      sourcePriceEurCents: input.sourcePriceEurCents,
+      shippingEurCents: input.shippingEurCents,
+      stockStatus: input.stockStatus,
+      sourceVerified: false,
+      expiresAt: null,
+      // A manual edit is not a new retailer observation. Automated ingestion
+      // remains the sole owner of the source freshness timestamp.
+      updatedAt: new Date(),
+    };
+    await tx
+      .update(sourceOffers)
+      .set(after)
+      .where(eq(sourceOffers.id, input.id));
+    const observationChanged =
+      before.sourcePriceEurCents !== after.sourcePriceEurCents ||
+      before.shippingEurCents !== after.shippingEurCents ||
+      before.stockStatus !== after.stockStatus;
+    if (observationChanged)
+      await tx.insert(offerPriceHistory).values({
+        offerId: input.id,
+        priceEurCents: after.sourcePriceEurCents,
+        shippingEurCents: after.shippingEurCents,
+        stockStatus: after.stockStatus,
+      });
+    await audit(
+      tx,
+      input.actorUserId,
+      "catalog.offer_updated",
+      "source_offer",
+      input.id,
+      before,
+      after,
+    );
+  });
+}
+
+export async function archiveAdminOffer(
+  db: Database,
+  input: { id: string; actorUserId: string },
+) {
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(sourceOffers)
+      .where(eq(sourceOffers.id, input.id))
+      .for("update")
+      .limit(1);
+    if (!before) throw new AdminOperationError("OFFER_NOT_FOUND");
+    const after = {
+      sourceVerified: false,
+      stockStatus: "OUT_OF_STOCK" as const,
+      expiresAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await tx
+      .update(sourceOffers)
+      .set(after)
+      .where(eq(sourceOffers.id, input.id));
+    await audit(
+      tx,
+      input.actorUserId,
+      "catalog.offer_archived",
+      "source_offer",
+      input.id,
+      before,
       after,
     );
   });
@@ -399,6 +745,8 @@ export async function updateAdminRetailer(
   input: {
     id: string;
     actorUserId: string;
+    name?: string;
+    domain?: string;
     isEnabled: boolean;
     trustTier:
       | "OFFICIAL_BRAND"
@@ -419,7 +767,16 @@ export async function updateAdminRetailer(
       .for("update")
       .limit(1);
     if (!before) throw new AdminOperationError("RETAILER_NOT_FOUND");
+    const name = input.name?.trim() || before.name;
+    const domain = (input.domain?.trim() || before.domain)
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, "");
+    if (name.length < 2 || name.length > 160 || !/^[a-z0-9.-]+$/.test(domain))
+      throw new AdminOperationError("RETAILER_INPUT_INVALID");
     const after = {
+      name,
+      domain,
       isEnabled: input.isEnabled,
       trustTier: input.trustTier,
       defaultIntervalMinutes: input.defaultIntervalMinutes,
@@ -431,6 +788,87 @@ export async function updateAdminRetailer(
       tx,
       input.actorUserId,
       "sources.retailer_updated",
+      "retailer",
+      input.id,
+      before,
+      after,
+    );
+  });
+}
+
+export async function createAdminRetailer(
+  db: Database,
+  input: Omit<
+    Parameters<typeof updateAdminRetailer>[1],
+    "id" | "name" | "domain"
+  > & { name: string; domain: string },
+) {
+  const name = input.name.trim();
+  const domain = input.domain
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+  if (
+    name.length < 2 ||
+    name.length > 160 ||
+    !/^[a-z0-9.-]+$/.test(domain) ||
+    input.defaultIntervalMinutes < 5 ||
+    input.defaultIntervalMinutes > 43_200
+  )
+    throw new AdminOperationError("RETAILER_INPUT_INVALID");
+  return db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(retailers)
+      .values({
+        name,
+        domain,
+        isEnabled: input.isEnabled,
+        trustTier: input.trustTier,
+        defaultIntervalMinutes: input.defaultIntervalMinutes,
+        termsNotes: input.termsNotes?.trim() || null,
+      })
+      .returning();
+    if (!created) throw new AdminOperationError("RETAILER_NOT_CREATED");
+    await audit(
+      tx,
+      input.actorUserId,
+      "sources.retailer_created",
+      "retailer",
+      created.id,
+      null,
+      created,
+    );
+    return created;
+  });
+}
+
+export async function archiveAdminRetailer(
+  db: Database,
+  input: { id: string; actorUserId: string },
+) {
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(retailers)
+      .where(eq(retailers.id, input.id))
+      .for("update")
+      .limit(1);
+    if (!before) throw new AdminOperationError("RETAILER_NOT_FOUND");
+    const after = {
+      isEnabled: false,
+      trustTier: "UNVERIFIED" as const,
+      updatedAt: new Date(),
+    };
+    await tx.update(retailers).set(after).where(eq(retailers.id, input.id));
+    await tx
+      .update(sourceOffers)
+      .set({ sourceVerified: false, updatedAt: new Date() })
+      .where(eq(sourceOffers.retailerId, input.id));
+    await audit(
+      tx,
+      input.actorUserId,
+      "sources.retailer_archived",
       "retailer",
       input.id,
       before,

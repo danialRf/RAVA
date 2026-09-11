@@ -38,6 +38,8 @@ const LABELS: Record<string, string> = {
   TRUSTED_MARKETPLACE: "مارکت‌پلیس بررسی‌شده",
   UNVERIFIED: "تأییدنشده",
   IN_STOCK: "موجود",
+  LOW_STOCK: "موجودی محدود",
+  PREORDER: "پیش‌فروش",
   OUT_OF_STOCK: "ناموجود",
   UNKNOWN: "نامعلوم",
   PURCHASED: "خریداری‌شده",

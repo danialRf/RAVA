@@ -14,6 +14,7 @@ import {
   payments,
   productRequests,
   products,
+  productMedia,
   productVariants,
   purchaseDocuments,
   purchases,
@@ -92,6 +93,11 @@ export async function listAdminCatalog(executor: Executor, limit = 100) {
       transportClass: products.transportClass,
       brandName: brands.name,
       categoryName: categories.nameFa,
+      brandId: products.brandId,
+      categoryId: products.categoryId,
+      imageUrl: sql<
+        string | null
+      >`(select coalesce(${productMedia.sourceUrl}, ${productMedia.storageKey}) from ${productMedia} where ${productMedia.productId} = ${products.id} order by case when ${productMedia.kind} = 'PRIMARY' then 0 else 1 end, ${productMedia.sortOrder} limit 1)`,
       variantCount: sql<number>`(select count(*)::int from ${productVariants} where ${productVariants.productId} = ${products.id})`,
       offerCount: sql<number>`(select count(*)::int from ${sourceOffers} inner join ${productVariants} on ${sourceOffers.productVariantId} = ${productVariants.id} where ${productVariants.productId} = ${products.id})`,
       updatedAt: products.updatedAt,
@@ -103,6 +109,22 @@ export async function listAdminCatalog(executor: Executor, limit = 100) {
     .limit(limit);
 }
 
+export async function getAdminProductFormOptions(executor: Executor) {
+  const [brandRows, categoryRows] = await Promise.all([
+    executor
+      .select({ id: brands.id, name: brands.name })
+      .from(brands)
+      .where(eq(brands.isActive, true))
+      .orderBy(brands.name),
+    executor
+      .select({ id: categories.id, name: categories.nameFa })
+      .from(categories)
+      .where(eq(categories.isEnabled, true))
+      .orderBy(categories.sortOrder, categories.nameFa),
+  ]);
+  return { brands: brandRows, categories: categoryRows };
+}
+
 export async function listAdminOffers(executor: Executor, limit = 100) {
   return executor
     .select({
@@ -112,6 +134,10 @@ export async function listAdminOffers(executor: Executor, limit = 100) {
       sourcePriceEurCents: sourceOffers.sourcePriceEurCents,
       stockStatus: sourceOffers.stockStatus,
       sourceVerified: sourceOffers.sourceVerified,
+      retailerId: sourceOffers.retailerId,
+      productVariantId: sourceOffers.productVariantId,
+      shippingEurCents: sourceOffers.shippingEurCents,
+      expiresAt: sourceOffers.expiresAt,
       retailerName: retailers.name,
       productTitle: products.titleFa,
       lastSeenAt: sourceOffers.lastSeenAt,
@@ -125,6 +151,31 @@ export async function listAdminOffers(executor: Executor, limit = 100) {
     .leftJoin(products, eq(products.id, productVariants.productId))
     .orderBy(desc(sourceOffers.lastSeenAt))
     .limit(limit);
+}
+
+export async function getAdminOfferFormOptions(executor: Executor) {
+  const [sourceRows, variantRows] = await Promise.all([
+    executor
+      .select({
+        id: retailers.id,
+        name: retailers.name,
+        isEnabled: retailers.isEnabled,
+      })
+      .from(retailers)
+      .orderBy(retailers.name),
+    executor
+      .select({
+        id: productVariants.id,
+        sku: productVariants.skuInternal,
+        title: products.titleFa,
+        size: productVariants.size,
+        color: productVariants.color,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .orderBy(products.titleFa, productVariants.skuInternal),
+  ]);
+  return { retailers: sourceRows, variants: variantRows };
 }
 
 export async function listAdminPricingRules(executor: Executor) {

@@ -12,9 +12,15 @@ import type { Database } from "./client";
 import {
   addCartItem,
   assignOrderToTrip,
+  archiveAdminOffer,
+  archiveAdminProduct,
+  archiveAdminRetailer,
   capturePayment,
   createAdminContent,
+  createAdminOffer,
+  createAdminProduct,
   createAdminPricingRule,
+  createAdminRetailer,
   createAdminTrip,
   completeGatewayDeposit,
   completeGatewayPayment,
@@ -70,6 +76,7 @@ import {
   setDefaultAddress,
   transitionOrderStatus,
   updateAdminContentStatus,
+  updateAdminOffer,
   updateAdminProduct,
   updateAdminRetailer,
   updateAdminTripStatus,
@@ -93,6 +100,7 @@ import {
   payments,
   pricingRules,
   productVariants,
+  productMedia,
   products,
   trips,
   tripItems,
@@ -126,6 +134,60 @@ afterAll(async () => {
 });
 
 describe("admin phase 6 management", () => {
+  it("creates, edits and safely archives a product with its image", async () => {
+    const fixture = await createCatalogFixture();
+    const [actor] = await db
+      .insert(users)
+      .values({ email: "product-manager@example.com", role: "MERCHANDISER" })
+      .returning();
+    if (!actor) throw new Error("Admin fixture missing");
+
+    const created = await createAdminProduct(db, {
+      actorUserId: actor.id,
+      brandId: fixture.brand.id,
+      categoryId: fixture.category.id,
+      titleFa: "محصول تازه",
+      titleOriginal: "New Product",
+      descriptionFa: "توضیح واقعی محصول",
+      weightGrams: 250,
+      transportClass: "S",
+      skuInternal: "RAVA-NEW-001",
+      size: "M",
+      color: "مشکی",
+      imageUrl: "https://cdn.example.com/product.webp",
+      imageAlt: "تصویر محصول تازه",
+    });
+    const [variant] = await db
+      .select()
+      .from(productVariants)
+      .where(sql`${productVariants.productId} = ${created.id}`);
+    const [media] = await db
+      .select()
+      .from(productMedia)
+      .where(sql`${productMedia.productId} = ${created.id}`);
+    expect(variant).toMatchObject({ skuInternal: "RAVA-NEW-001", size: "M" });
+    expect(media).toMatchObject({
+      kind: "PRIMARY",
+      altTextFa: "تصویر محصول تازه",
+    });
+
+    await updateAdminProduct(db, {
+      id: created.id,
+      actorUserId: actor.id,
+      titleFa: "محصول تازه ویرایش‌شده",
+      status: "PUBLISHED",
+      descriptionFa: "نسخه نهایی",
+      weightGrams: 260,
+      transportClass: "S",
+    });
+    await archiveAdminProduct(db, { id: created.id, actorUserId: actor.id });
+    const [archived] = await db
+      .select()
+      .from(products)
+      .where(sql`${products.id} = ${created.id}`);
+    expect(archived).toMatchObject({ status: "ARCHIVED", publishedAt: null });
+  });
+
   it("audits catalog, offer, pricing, trip, source and content changes", async () => {
     const fixture = await createCatalogFixture();
     const [actor] = await db
@@ -292,6 +354,77 @@ describe("admin phase 6 management", () => {
         sourceVerified: true,
       }),
     ).rejects.toMatchObject({ code: "UNMATCHED_OFFER_CANNOT_BE_VERIFIED" });
+  });
+
+  it("creates, edits and safely archives retailers and offers", async () => {
+    const fixture = await createCatalogFixture();
+    const [actor] = await db
+      .insert(users)
+      .values({ email: "catalog-manager@example.com", role: "ADMIN" })
+      .returning();
+    if (!actor) throw new Error("Admin fixture missing");
+
+    const retailer = await createAdminRetailer(db, {
+      actorUserId: actor.id,
+      name: "German Test Shop",
+      domain: "shop.example.de",
+      isEnabled: true,
+      trustTier: "AUTHORIZED_RETAILER",
+      defaultIntervalMinutes: 180,
+      termsNotes: null,
+    });
+    const offer = await createAdminOffer(db, {
+      actorUserId: actor.id,
+      retailerId: retailer.id,
+      productVariantId: fixture.variant.id,
+      sourceUrl: "https://shop.example.de/item/samba",
+      rawTitle: "Adidas Samba Test",
+      sourcePriceEurCents: 9_900n,
+      shippingEurCents: 500n,
+      stockStatus: "IN_STOCK",
+    });
+    expect(offer.sourceVerified).toBe(false);
+
+    await updateAdminOffer(db, {
+      id: offer.id,
+      actorUserId: actor.id,
+      retailerId: retailer.id,
+      productVariantId: fixture.variant.id,
+      sourceUrl: "https://shop.example.de/item/samba",
+      rawTitle: "Adidas Samba Updated",
+      sourcePriceEurCents: 8_900n,
+      shippingEurCents: 500n,
+      stockStatus: "LOW_STOCK",
+    });
+    await reviewAdminOffer(db, {
+      id: offer.id,
+      actorUserId: actor.id,
+      sourceVerified: true,
+    });
+    await archiveAdminOffer(db, { id: offer.id, actorUserId: actor.id });
+    const [archivedOffer] = await db
+      .select()
+      .from(sourceOffers)
+      .where(sql`${sourceOffers.id} = ${offer.id}`);
+    expect(archivedOffer).toMatchObject({
+      sourceVerified: false,
+      stockStatus: "OUT_OF_STOCK",
+    });
+    expect(archivedOffer?.expiresAt).toBeInstanceOf(Date);
+
+    await archiveAdminRetailer(db, {
+      id: retailer.id,
+      actorUserId: actor.id,
+    });
+    const [archivedRetailer] = await db
+      .select()
+      .from(retailers)
+      .where(sql`${retailers.id} = ${retailer.id}`);
+    expect(archivedRetailer).toMatchObject({
+      isEnabled: false,
+      trustTier: "UNVERIFIED",
+    });
+    expect(await listOfferPriceHistory(db, offer.id)).toHaveLength(2);
   });
 });
 

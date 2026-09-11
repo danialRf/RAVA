@@ -5,13 +5,20 @@ import { randomUUID } from "node:crypto";
 import { loadEnvironment } from "@rava/config";
 import {
   createAdminContent,
+  createAdminProduct,
+  createAdminOffer,
   createAdminPricingRule,
+  createAdminRetailer,
   createAdminTrip,
   assignOrderToTrip,
+  archiveAdminOffer,
+  archiveAdminProduct,
+  archiveAdminRetailer,
   reviewAdminOffer,
   reviewCardPayment,
   receiveOrderInGermany,
   updateAdminContentStatus,
+  updateAdminOffer,
   updateAdminProduct,
   updateAdminProductRequest,
   updateAdminRetailer,
@@ -20,6 +27,7 @@ import {
   operateOrderLifecycle,
 } from "@rava/db";
 import {
+  createPublicStorage,
   createPrivateStorage,
   matchesImageSignature,
 } from "@rava/integrations";
@@ -35,6 +43,44 @@ const UUID =
 
 function field(formData: FormData, name: string): string {
   return String(formData.get(name) ?? "").trim();
+}
+
+async function productImage(formData: FormData, userId: string) {
+  const image = formData.get("image");
+  if (!(image instanceof File) || image.size === 0) return null;
+  const allowed = ["image/jpeg", "image/png", "image/webp"];
+  if (image.size > 5 * 1024 * 1024 || !allowed.includes(image.type))
+    destination(
+      "/admin/catalog",
+      "error",
+      "تصویر باید JPG، PNG یا WebP و حداکثر ۵ مگابایت باشد.",
+    );
+  const bytes = new Uint8Array(await image.arrayBuffer());
+  if (!matchesImageSignature(bytes, image.type))
+    destination(
+      "/admin/catalog",
+      "error",
+      "محتوای فایل با نوع تصویر مطابقت ندارد.",
+    );
+  const extension =
+    image.type === "image/png"
+      ? "png"
+      : image.type === "image/webp"
+        ? "webp"
+        : "jpg";
+  try {
+    return await createPublicStorage(loadEnvironment()).putPublic(
+      `products/${userId}/${randomUUID()}.${extension}`,
+      bytes,
+      image.type,
+    );
+  } catch {
+    destination(
+      "/admin/catalog",
+      "error",
+      "بارگذاری تصویر انجام نشد؛ دوباره تلاش کنید.",
+    );
+  }
 }
 
 function eurCents(value: string, allowZero = false): bigint | null {
@@ -232,23 +278,33 @@ export async function updateProductAction(formData: FormData) {
   const transport = field(formData, "transportClass");
   const weightValue = field(formData, "weightGrams");
   const weight = weightValue ? integer(weightValue, 1, 1_000_000) : null;
+  const brandId = field(formData, "brandId");
+  const categoryId = field(formData, "categoryId");
   if (
     !UUID.test(id) ||
     !["DRAFT", "NEEDS_REVIEW", "PUBLISHED", "ARCHIVED"].includes(status) ||
     !["", "XS", "S", "M", "L", "BLOCKED"].includes(transport) ||
-    (weightValue && weight === null)
+    (weightValue && weight === null) ||
+    (brandId && !UUID.test(brandId)) ||
+    (categoryId && !UUID.test(categoryId))
   )
     destination("/admin/catalog", "error", "اطلاعات محصول معتبر نیست.");
   try {
+    const storedImage = await productImage(formData, user.id);
     await updateAdminProduct(database(), {
       id,
       actorUserId: user.id,
       titleFa: field(formData, "titleFa"),
+      titleOriginal: field(formData, "titleOriginal"),
+      ...(brandId ? { brandId } : {}),
+      ...(categoryId ? { categoryId } : {}),
       descriptionFa: field(formData, "descriptionFa") || null,
       status: status as "DRAFT" | "NEEDS_REVIEW" | "PUBLISHED" | "ARCHIVED",
       weightGrams: weight,
       transportClass: (transport || null) as
         "XS" | "S" | "M" | "L" | "BLOCKED" | null,
+      imageUrl: storedImage?.publicUrl ?? null,
+      imageAlt: field(formData, "imageAlt") || null,
     });
   } catch {
     destination("/admin/catalog", "error", "ویرایش محصول انجام نشد.");
@@ -260,6 +316,65 @@ export async function updateProductAction(formData: FormData) {
     "notice",
     "محصول و تاریخچه ممیزی به‌روزرسانی شد.",
   );
+}
+
+export async function createProductAction(formData: FormData) {
+  const user = await requireAdmin("CATALOG_WRITE");
+  const brandId = field(formData, "brandId");
+  const categoryId = field(formData, "categoryId");
+  const transport = field(formData, "transportClass");
+  const weightValue = field(formData, "weightGrams");
+  const weight = weightValue ? integer(weightValue, 1, 1_000_000) : null;
+  if (
+    !UUID.test(brandId) ||
+    !UUID.test(categoryId) ||
+    !["", "XS", "S", "M", "L", "BLOCKED"].includes(transport) ||
+    (weightValue && weight === null)
+  )
+    destination("/admin/catalog", "error", "اطلاعات محصول معتبر نیست.");
+  try {
+    const storedImage = await productImage(formData, user.id);
+    await createAdminProduct(database(), {
+      actorUserId: user.id,
+      brandId,
+      categoryId,
+      titleFa: field(formData, "titleFa"),
+      titleOriginal: field(formData, "titleOriginal"),
+      descriptionFa: field(formData, "descriptionFa") || null,
+      weightGrams: weight,
+      transportClass: (transport || null) as
+        "XS" | "S" | "M" | "L" | "BLOCKED" | null,
+      skuInternal: field(formData, "skuInternal"),
+      size: field(formData, "size") || null,
+      color: field(formData, "color") || null,
+      imageUrl: storedImage?.publicUrl ?? null,
+      imageAlt: field(formData, "imageAlt") || null,
+    });
+  } catch {
+    destination(
+      "/admin/catalog",
+      "error",
+      "ساخت محصول انجام نشد؛ SKU تکراری یا اطلاعات فرم را بررسی کنید.",
+    );
+  }
+  revalidatePath("/admin/catalog");
+  revalidatePath("/");
+  destination("/admin/catalog", "notice", "محصول به‌صورت پیش‌نویس ساخته شد.");
+}
+
+export async function archiveProductAction(formData: FormData) {
+  const user = await requireAdmin("CATALOG_WRITE");
+  const id = field(formData, "id");
+  if (!UUID.test(id))
+    destination("/admin/catalog", "error", "محصول معتبر نیست.");
+  try {
+    await archiveAdminProduct(database(), { id, actorUserId: user.id });
+  } catch {
+    destination("/admin/catalog", "error", "آرشیو محصول انجام نشد.");
+  }
+  revalidatePath("/admin/catalog");
+  revalidatePath("/");
+  destination("/admin/catalog", "notice", "محصول از سایت خارج و آرشیو شد.");
 }
 
 export async function reviewOfferAction(formData: FormData) {
@@ -282,6 +397,77 @@ export async function reviewOfferAction(formData: FormData) {
   }
   revalidatePath("/admin/offers");
   destination("/admin/offers", "notice", "وضعیت پیشنهاد ثبت شد.");
+}
+
+export async function saveOfferAction(formData: FormData) {
+  const user = await requireAdmin("CATALOG_WRITE");
+  const id = field(formData, "id");
+  const retailerId = field(formData, "retailerId");
+  const productVariantId = field(formData, "productVariantId");
+  const price = eurCents(field(formData, "sourcePriceEur"));
+  const shippingValue = field(formData, "shippingEur");
+  const shipping = shippingValue ? eurCents(shippingValue, true) : null;
+  const stockStatus = field(formData, "stockStatus");
+  if (
+    (id && !UUID.test(id)) ||
+    !UUID.test(retailerId) ||
+    !UUID.test(productVariantId) ||
+    price === null ||
+    (shippingValue && shipping === null) ||
+    !["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "PREORDER", "UNKNOWN"].includes(
+      stockStatus,
+    )
+  )
+    destination("/admin/offers", "error", "اطلاعات لینک خرید معتبر نیست.");
+  const input = {
+    actorUserId: user.id,
+    retailerId,
+    productVariantId,
+    sourceUrl: field(formData, "sourceUrl"),
+    rawTitle: field(formData, "rawTitle"),
+    sourcePriceEurCents: price,
+    shippingEurCents: shipping,
+    stockStatus: stockStatus as
+      "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "PREORDER" | "UNKNOWN",
+  };
+  try {
+    if (id) await updateAdminOffer(database(), { ...input, id });
+    else await createAdminOffer(database(), input);
+  } catch {
+    destination(
+      "/admin/offers",
+      "error",
+      "ذخیره انجام نشد؛ لینک تکراری، فروشگاه یا اطلاعات محصول را بررسی کنید.",
+    );
+  }
+  revalidatePath("/admin/offers");
+  revalidatePath("/");
+  destination(
+    "/admin/offers",
+    "notice",
+    id
+      ? "لینک خرید ویرایش شد و برای تأیید مجدد آماده است."
+      : "لینک خرید ساخته شد؛ پس از بررسی آن را تأیید کنید.",
+  );
+}
+
+export async function archiveOfferAction(formData: FormData) {
+  const user = await requireAdmin("CATALOG_WRITE");
+  const id = field(formData, "id");
+  if (!UUID.test(id))
+    destination("/admin/offers", "error", "لینک خرید معتبر نیست.");
+  try {
+    await archiveAdminOffer(database(), { id, actorUserId: user.id });
+  } catch {
+    destination("/admin/offers", "error", "آرشیو لینک خرید انجام نشد.");
+  }
+  revalidatePath("/admin/offers");
+  revalidatePath("/");
+  destination(
+    "/admin/offers",
+    "notice",
+    "لینک خرید آرشیو شد و دیگر در فروش استفاده نمی‌شود.",
+  );
 }
 
 export async function createPricingRuleAction(formData: FormData) {
@@ -427,6 +613,8 @@ export async function updateRetailerAction(formData: FormData) {
     await updateAdminRetailer(database(), {
       id,
       actorUserId: user.id,
+      name: field(formData, "name"),
+      domain: field(formData, "domain"),
       isEnabled: field(formData, "isEnabled") === "on",
       trustTier: trustTier as
         | "OFFICIAL_BRAND"
@@ -442,6 +630,69 @@ export async function updateRetailerAction(formData: FormData) {
   revalidatePath("/admin/sources");
   revalidatePath("/admin/health");
   destination("/admin/sources", "notice", "سیاست منبع ثبت شد.");
+}
+
+export async function createRetailerAction(formData: FormData) {
+  const user = await requireAdmin("SOURCES_WRITE");
+  const trustTier = field(formData, "trustTier");
+  const interval = integer(
+    field(formData, "defaultIntervalMinutes"),
+    5,
+    43_200,
+  );
+  if (
+    interval === null ||
+    ![
+      "OFFICIAL_BRAND",
+      "AUTHORIZED_RETAILER",
+      "TRUSTED_MARKETPLACE",
+      "UNVERIFIED",
+    ].includes(trustTier)
+  )
+    destination("/admin/sources", "error", "اطلاعات فروشگاه معتبر نیست.");
+  try {
+    await createAdminRetailer(database(), {
+      actorUserId: user.id,
+      name: field(formData, "name"),
+      domain: field(formData, "domain"),
+      isEnabled: field(formData, "isEnabled") === "on",
+      trustTier: trustTier as
+        | "OFFICIAL_BRAND"
+        | "AUTHORIZED_RETAILER"
+        | "TRUSTED_MARKETPLACE"
+        | "UNVERIFIED",
+      defaultIntervalMinutes: interval,
+      termsNotes: field(formData, "termsNotes") || null,
+    });
+  } catch {
+    destination(
+      "/admin/sources",
+      "error",
+      "فروشگاه ساخته نشد؛ نام یا دامنه را بررسی کنید.",
+    );
+  }
+  revalidatePath("/admin/sources");
+  destination("/admin/sources", "notice", "فروشگاه جدید ثبت شد.");
+}
+
+export async function archiveRetailerAction(formData: FormData) {
+  const user = await requireAdmin("SOURCES_WRITE");
+  const id = field(formData, "id");
+  if (!UUID.test(id))
+    destination("/admin/sources", "error", "فروشگاه معتبر نیست.");
+  try {
+    await archiveAdminRetailer(database(), { id, actorUserId: user.id });
+  } catch {
+    destination("/admin/sources", "error", "غیرفعال‌سازی فروشگاه انجام نشد.");
+  }
+  revalidatePath("/admin/sources");
+  revalidatePath("/admin/offers");
+  revalidatePath("/");
+  destination(
+    "/admin/sources",
+    "notice",
+    "فروشگاه غیرفعال شد و لینک‌های آن از فروش خارج شدند.",
+  );
 }
 
 export async function createContentAction(formData: FormData) {

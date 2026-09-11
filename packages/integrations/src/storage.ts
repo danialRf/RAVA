@@ -19,6 +19,10 @@ export interface StoredObject {
   readonly sizeBytes: number;
 }
 
+export interface PublicStoredObject extends StoredObject {
+  readonly publicUrl: string;
+}
+
 /** Rejects renamed or spoofed uploads before they enter private storage. */
 export function matchesImageSignature(
   bytes: Uint8Array,
@@ -167,9 +171,92 @@ export interface StorageProviderConfiguration {
   readonly STORAGE_PROVIDER: "minio" | "s3" | "fake";
   readonly S3_ENDPOINT: string;
   readonly S3_REGION: string;
+  readonly S3_BUCKET_PUBLIC: string;
   readonly S3_BUCKET_PRIVATE: string;
   readonly S3_ACCESS_KEY: string;
   readonly S3_SECRET_KEY: string;
+}
+
+export interface PublicStorage {
+  readonly id: string;
+  putPublic(
+    objectKey: string,
+    body: Uint8Array,
+    contentType: string,
+  ): Promise<PublicStoredObject>;
+}
+
+class S3PublicStorage implements PublicStorage {
+  readonly id: string;
+  readonly #client: S3Client;
+  readonly #bucket: string;
+  readonly #endpoint: string;
+
+  constructor(input: {
+    endpoint: string;
+    region: string;
+    bucket: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    id: string;
+  }) {
+    this.id = input.id;
+    this.#bucket = input.bucket;
+    this.#endpoint = input.endpoint.replace(/\/$/, "");
+    this.#client = new S3Client({
+      endpoint: input.endpoint,
+      region: input.region,
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: input.accessKeyId,
+        secretAccessKey: input.secretAccessKey,
+      },
+    });
+  }
+
+  async putPublic(objectKey: string, body: Uint8Array, contentType: string) {
+    await this.#client.send(
+      new PutObjectCommand({
+        Bucket: this.#bucket,
+        Key: objectKey,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
+    return {
+      objectKey,
+      contentType,
+      sizeBytes: body.byteLength,
+      publicUrl: `${this.#endpoint}/${this.#bucket}/${objectKey}`,
+    };
+  }
+}
+
+class InMemoryPublicStorage implements PublicStorage {
+  readonly id = "memory";
+  async putPublic(objectKey: string, body: Uint8Array, contentType: string) {
+    return {
+      objectKey,
+      contentType,
+      sizeBytes: body.byteLength,
+      publicUrl: `/products/${encodeURIComponent(objectKey)}`,
+    };
+  }
+}
+
+export function createPublicStorage(
+  configuration: StorageProviderConfiguration,
+): PublicStorage {
+  if (configuration.STORAGE_PROVIDER === "fake")
+    return new InMemoryPublicStorage();
+  return new S3PublicStorage({
+    endpoint: configuration.S3_ENDPOINT,
+    region: configuration.S3_REGION,
+    bucket: configuration.S3_BUCKET_PUBLIC,
+    accessKeyId: configuration.S3_ACCESS_KEY,
+    secretAccessKey: configuration.S3_SECRET_KEY,
+    id: configuration.STORAGE_PROVIDER,
+  });
 }
 
 export function createPrivateStorage(

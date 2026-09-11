@@ -4,6 +4,17 @@ const developmentConnectSources =
   process.env.NODE_ENV === "development"
     ? " http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*"
     : "";
+const developmentImageSources =
+  process.env.NODE_ENV === "development"
+    ? " http://localhost:* http://127.0.0.1:*"
+    : "";
+let storageImageSource = "";
+try {
+  if (process.env.S3_ENDPOINT)
+    storageImageSource = ` ${new URL(process.env.S3_ENDPOINT).origin}`;
+} catch {
+  // Invalid production configuration is rejected by the runtime preflight.
+}
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -28,7 +39,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'${developmentConnectSources}`,
+            value: `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; img-src 'self' data: blob:${developmentImageSources}${storageImageSource}; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'${developmentConnectSources}`,
           },
         ],
       },
