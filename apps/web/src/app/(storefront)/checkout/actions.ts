@@ -28,11 +28,14 @@ const UUID =
 
 export async function addToCartAction(formData: FormData): Promise<void> {
   const variantId = String(formData.get("variantId") ?? "");
-  const sourceOfferId = String(formData.get("offerId") ?? "");
-  if (!UUID.test(variantId) || !UUID.test(sourceOfferId)) redirect("/category");
+  const offerId = String(formData.get("offerId") ?? "");
+  // An empty offer id means a manually priced variant. The server still
+  // verifies the variant is actually purchasable before it reaches a cart.
+  if (!UUID.test(variantId)) redirect("/category");
+  if (offerId !== "" && !UUID.test(offerId)) redirect("/category");
   const added = await addCurrentCartItem({
     productVariantId: variantId,
-    sourceOfferId,
+    sourceOfferId: offerId === "" ? null : offerId,
   });
   redirect(added ? "/cart?notice=added" : "/cart?error=unavailable");
 }

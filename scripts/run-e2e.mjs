@@ -67,7 +67,14 @@ if (databasePreparation.status !== 0) {
   throw new Error("RAVA E2E database preparation failed.");
 }
 
-const e2eDatabaseUrl = databasePreparation.stdout.trim();
+// A database driver notice can land on stdout ahead of the URL, so take the
+// last line that actually looks like a connection string.
+const e2eDatabaseUrl =
+  (databasePreparation.stdout ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("postgresql://"))
+    .pop() ?? "";
 if (!e2eDatabaseUrl.startsWith("postgresql://")) {
   throw new Error("RAVA E2E database preparation returned an invalid URL.");
 }

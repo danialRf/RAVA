@@ -66,7 +66,7 @@ export async function getCurrentCart() {
 
 export async function addCurrentCartItem(input: {
   readonly productVariantId: string;
-  readonly sourceOfferId: string;
+  readonly sourceOfferId: string | null;
   readonly quantity?: number;
 }) {
   const cart = await ensureCurrentCart();
@@ -107,24 +107,31 @@ export async function readCartModel(checkoutRate?: CheckoutRate | null) {
     checkoutRate === undefined ? await getCheckoutRate() : checkoutRate;
   const items = await Promise.all(
     rows.map(async (row) => {
-      const estimate =
-        row.sourceVerified &&
-        ["IN_STOCK", "LOW_STOCK"].includes(row.stockStatus)
-          ? await estimateFor(
-              {
-                productId: row.productId,
-                brandId: row.brandId,
-                categoryId: row.categoryId,
-                sourcePriceEurCents: row.sourcePriceEurCents,
-                shippingEurCents: row.shippingEurCents,
-                previousPriceEurCents: null,
-                weightGrams: row.weightGrams,
-                transportClass: row.transportClass,
-                categoryTransportClass: row.categoryTransportClass,
-              },
-              rate,
-            )
-          : null;
+      const manual = row.manualPriceToman !== null;
+      const sellable = manual
+        ? ["IN_STOCK", "LOW_STOCK", "PREORDER"].includes(
+            row.manualStockStatus ?? "IN_STOCK",
+          )
+        : row.sourceVerified === true &&
+          row.stockStatus !== null &&
+          ["IN_STOCK", "LOW_STOCK"].includes(row.stockStatus);
+      const estimate = sellable
+        ? await estimateFor(
+            {
+              productId: row.productId,
+              brandId: row.brandId,
+              categoryId: row.categoryId,
+              manualPriceToman: row.manualPriceToman,
+              sourcePriceEurCents: row.sourcePriceEurCents,
+              shippingEurCents: row.shippingEurCents,
+              previousPriceEurCents: null,
+              weightGrams: row.weightGrams,
+              transportClass: row.transportClass,
+              categoryTransportClass: row.categoryTransportClass,
+            },
+            rate,
+          )
+        : null;
       return {
         ...row,
         variantLabel: variantLabel(row),
@@ -148,40 +155,77 @@ export async function readCartModel(checkoutRate?: CheckoutRate | null) {
 }
 
 export async function createFreshQuote(userId: string) {
-  // A quote must be calculated and persisted from one immutable FX snapshot.
+  // A quote is calculated and persisted from one immutable snapshot. An FX
+  // snapshot is required only when a line is actually priced in EUR; a cart of
+  // manually priced items needs no rate and must not be blocked by one.
   const rate = await getCheckoutRate();
-  if (!rate) throw new Error("FX_UNAVAILABLE");
   const model = await readCartModel(rate);
   if (!model.cart || model.items.length === 0) throw new Error("CART_EMPTY");
+  const needsFx = model.items.some((item) => item.manualPriceToman === null);
+  if (needsFx && !rate) throw new Error("FX_UNAVAILABLE");
   if (model.items.some((item) => item.estimate === null))
     throw new Error("ITEM_UNAVAILABLE");
+  const quotedAt = new Date();
   const lines = model.items.map((item) => {
     const estimate = item.estimate!;
     const quantity = BigInt(item.quantity);
+    const lineTotalToman = estimate.estimatedToman * quantity;
+    const cost = estimate.breakdown;
+
+    // A manually priced line has no cost decomposition. Persisting zeros here
+    // is not a guess: it records that no source, transport or FX cost was part
+    // of this price, and the line total is the operator's own number.
+    if (cost === null) {
+      return {
+        sourceOfferId: null,
+        productVariantId: item.variantId,
+        quantity: item.quantity,
+        sourcePriceEurCents: 0n,
+        shippingEurCents: 0n,
+        sourceTomanTotal: lineTotalToman,
+        transportToman: 0n,
+        customsRiskToman: 0n,
+        localDeliveryToman: 0n,
+        paymentFeeToman: 0n,
+        marginToman: 0n,
+        lineTotalToman,
+        observedAt: quotedAt,
+        breakdown: {
+          titleFa: item.titleFa,
+          titleOriginal: item.titleOriginal,
+          brand: item.brandName,
+          variant: item.variantLabel,
+          priceSource: "MANUAL",
+          ruleId: estimate.ruleId ?? "",
+        },
+      };
+    }
+
     return {
       sourceOfferId: item.offerId,
       productVariantId: item.variantId,
       quantity: item.quantity,
-      sourcePriceEurCents: item.sourcePriceEurCents,
+      // Non-null on this branch: a cost breakdown only exists for an offer.
+      sourcePriceEurCents: item.sourcePriceEurCents ?? 0n,
       shippingEurCents: item.shippingEurCents ?? 0n,
-      sourceTomanTotal: estimate.breakdown.sourceToman * quantity,
-      transportToman: estimate.breakdown.transportToman * quantity,
-      customsRiskToman: estimate.breakdown.customsRiskToman * quantity,
-      localDeliveryToman: estimate.breakdown.localDeliveryToman * quantity,
-      paymentFeeToman: estimate.breakdown.paymentFeeToman * quantity,
-      marginToman: estimate.breakdown.marginToman * quantity,
-      lineTotalToman: estimate.estimatedToman * quantity,
-      observedAt: item.observedAt,
+      sourceTomanTotal: cost.sourceToman * quantity,
+      transportToman: cost.transportToman * quantity,
+      customsRiskToman: cost.customsRiskToman * quantity,
+      localDeliveryToman: cost.localDeliveryToman * quantity,
+      paymentFeeToman: cost.paymentFeeToman * quantity,
+      marginToman: cost.marginToman * quantity,
+      lineTotalToman,
+      observedAt: item.observedAt ?? quotedAt,
       breakdown: {
         titleFa: item.titleFa,
         titleOriginal: item.titleOriginal,
         brand: item.brandName,
         variant: item.variantLabel,
-        retailer: item.retailerName,
-        sourceUrl: item.sourceUrl,
-        ruleId: estimate.ruleId,
-        effectiveTomanPerEur:
-          estimate.breakdown.effectiveTomanPerEur.toString(),
+        retailer: item.retailerName ?? "",
+        sourceUrl: item.sourceUrl ?? "",
+        priceSource: "SOURCE_OFFER",
+        ruleId: estimate.ruleId ?? "",
+        effectiveTomanPerEur: cost.effectiveTomanPerEur.toString(),
       },
     };
   });
@@ -193,12 +237,16 @@ export async function createFreshQuote(userId: string) {
   return persistQuote(database(), {
     userId,
     cartId: model.cart.id,
-    fxRateId: rate.id,
-    fxTomanPerEur: rate.tomanPerEur,
+    fxRateId: needsFx && rate ? rate.id : null,
+    fxTomanPerEur: needsFx && rate ? rate.tomanPerEur : null,
     subtotalToman: lines.reduce((sum, line) => sum + line.sourceTomanTotal, 0n),
     finalToman,
     depositToman,
-    appliedRuleIds: [...new Set(lines.map((line) => line.breakdown.ruleId))],
+    appliedRuleIds: [
+      ...new Set(
+        lines.map((line) => line.breakdown.ruleId).filter((id) => id !== ""),
+      ),
+    ],
     calculationVersion: CALCULATION_VERSION,
     expiresAt: new Date(Date.now() + QUOTE_TTL_SECONDS * 1000),
     lines,

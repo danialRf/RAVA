@@ -99,6 +99,14 @@ export async function listAdminCatalog(executor: Executor, limit = 100) {
         string | null
       >`(select coalesce(${productMedia.sourceUrl}, ${productMedia.storageKey}) from ${productMedia} where ${productMedia.productId} = ${products.id} order by case when ${productMedia.kind} = 'PRIMARY' then 0 else 1 end, ${productMedia.sortOrder} limit 1)`,
       variantCount: sql<number>`(select count(*)::int from ${productVariants} where ${productVariants.productId} = ${products.id})`,
+      // Price and availability of the default (oldest) variant, which is the
+      // one the simplified product form owns.
+      manualPriceToman: sql<
+        bigint | null
+      >`(select ${productVariants.manualPriceToman} from ${productVariants} where ${productVariants.productId} = ${products.id} order by ${productVariants.createdAt} limit 1)`,
+      manualStockStatus: sql<
+        string | null
+      >`(select ${productVariants.manualStockStatus} from ${productVariants} where ${productVariants.productId} = ${products.id} order by ${productVariants.createdAt} limit 1)`,
       offerCount: sql<number>`(select count(*)::int from ${sourceOffers} inner join ${productVariants} on ${sourceOffers.productVariantId} = ${productVariants.id} where ${productVariants.productId} = ${products.id})`,
       updatedAt: products.updatedAt,
     })

@@ -3,6 +3,7 @@
 import { hasAdminPermission } from "@rava/domain";
 import Link from "next/link";
 
+import { AdminCreatePanel } from "../../../components/admin-create-panel";
 import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
 import {
   AdminFlash,
@@ -10,6 +11,7 @@ import {
   AdminStatGrid,
 } from "../../../components/admin-ui";
 import { AdminEntityStatus } from "../../../lib/admin-status";
+import { formatToman } from "../../../lib/format";
 import { adminQueries, requireAdmin } from "../../../server/admin";
 import {
   archiveProductAction,
@@ -18,6 +20,13 @@ import {
 } from "../actions";
 
 const TRANSPORT_CLASSES = ["XS", "S", "M", "L", "BLOCKED"] as const;
+
+const STOCK_CHOICES = [
+  ["IN_STOCK", "موجود"],
+  ["LOW_STOCK", "موجودی محدود"],
+  ["PREORDER", "پیش‌سفارش"],
+  ["OUT_OF_STOCK", "ناموجود"],
+] as const;
 
 export default async function AdminCatalogPage({
   searchParams,
@@ -37,24 +46,9 @@ export default async function AdminCatalogPage({
       <AdminPageHeader
         eyebrow="مدیریت فروشگاه"
         title="محصولات"
-        copy="محصول جدید بسازید، عکس و مشخصاتش را وارد کنید و بعد از بررسی در سایت منتشر کنید."
+        copy="محصول را بسازید، قیمت و عکسش را وارد کنید و منتشرش کنید. همه کار از همین صفحه انجام می‌شود."
       />
       <AdminFlash notice={query.notice} error={query.error} />
-      <div className="admin-primary-toolbar">
-        <div>
-          <strong>کالاهای فروشگاه</strong>
-          <span>همه کارهای روزمره محصول از همین صفحه انجام می‌شود.</span>
-        </div>
-        {writable && (
-          <a
-            className="admin-action-button"
-            data-tone="primary"
-            href="#new-product"
-          >
-            + افزودن محصول
-          </a>
-        )}
-      </div>
       <AdminStatGrid>
         <AdminStat
           label="همه محصولات"
@@ -74,20 +68,21 @@ export default async function AdminCatalogPage({
             .length.toLocaleString("fa-IR")}
         />
         <AdminStat
-          label="نیازمند بررسی"
+          label="بدون قیمت"
           value={activeItems
-            .filter((item) => item.status === "NEEDS_REVIEW")
+            .filter(
+              (item) => item.manualPriceToman === null && item.offerCount === 0,
+            )
             .length.toLocaleString("fa-IR")}
           tone="warning"
         />
       </AdminStatGrid>
       {writable && (
-        <details
-          className="admin-create-panel"
-          id="new-product"
-          open={activeItems.length === 0}
+        <AdminCreatePanel
+          label="+ افزودن محصول"
+          openLabel="بستن فرم"
+          defaultOpen={activeItems.length === 0}
         >
-          <summary>+ ساخت محصول جدید</summary>
           <form
             action={createProductAction}
             className="admin-form-grid"
@@ -132,6 +127,25 @@ export default async function AdminCatalogPage({
                 {options.categories.map((category) => (
                   <option value={category.id} key={category.id}>
                     {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              قیمت فروش (تومان)
+              <input
+                name="priceToman"
+                inputMode="numeric"
+                dir="ltr"
+                placeholder="مثلاً 4500000"
+              />
+            </label>
+            <label>
+              موجودی
+              <select name="stockStatus" defaultValue="IN_STOCK">
+                {STOCK_CHOICES.map(([value, label]) => (
+                  <option value={value} key={value}>
+                    {label}
                   </option>
                 ))}
               </select>
@@ -191,11 +205,12 @@ export default async function AdminCatalogPage({
             </label>
             <p className="admin-form-help wide">
               محصول ابتدا به‌صورت پیش‌نویس ذخیره می‌شود. بعد از بررسی می‌توانید
-              آن را منتشر کنید.
+              آن را منتشر کنید. اگر قیمت فروش را خالی بگذارید، محصول در سایت
+              بدون قیمت نمایش داده می‌شود و قابل سفارش نیست.
             </p>
             <button className="button primary">ساخت محصول</button>
           </form>
-        </details>
+        </AdminCreatePanel>
       )}
       {activeItems.length === 0 ? (
         <AdminEmptyState>
@@ -220,8 +235,17 @@ export default async function AdminCatalogPage({
                     {item.brandName} · {item.categoryName}
                   </small>
                 </span>
+                <span
+                  className="admin-product-price"
+                  data-unpriced={item.manualPriceToman === null}
+                >
+                  {item.manualPriceToman !== null
+                    ? `${formatToman(item.manualPriceToman)} تومان`
+                    : item.offerCount > 0
+                      ? "قیمت خودکار"
+                      : "بدون قیمت"}
+                </span>
                 <AdminEntityStatus status={item.status} />
-                <span>{item.variantCount.toLocaleString("fa-IR")} تنوع</span>
               </summary>
               <form
                 action={updateProductAction}
@@ -263,6 +287,29 @@ export default async function AdminCatalogPage({
                     {options.categories.map((category) => (
                       <option value={category.id} key={category.id}>
                         {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  قیمت فروش (تومان)
+                  <input
+                    name="priceToman"
+                    inputMode="numeric"
+                    dir="ltr"
+                    defaultValue={item.manualPriceToman?.toString() ?? ""}
+                    placeholder="خالی یعنی بدون قیمت"
+                  />
+                </label>
+                <label>
+                  موجودی
+                  <select
+                    name="stockStatus"
+                    defaultValue={item.manualStockStatus ?? "IN_STOCK"}
+                  >
+                    {STOCK_CHOICES.map(([value, label]) => (
+                      <option value={value} key={value}>
+                        {label}
                       </option>
                     ))}
                   </select>

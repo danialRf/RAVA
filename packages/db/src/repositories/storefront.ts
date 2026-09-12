@@ -70,6 +70,12 @@ export interface StorefrontProductRow {
   readonly categoryNameFa: string;
   readonly categorySlug: string;
   readonly categoryTransportClass: string | null;
+  /**
+   * Operator-set sell price in Toman, when this product is priced directly by
+   * RAVA. Null means the price comes from the best source offer below.
+   */
+  readonly manualPriceToman: bigint | null;
+  readonly manualStockStatus: StockStatus | null;
   /** Null when no purchasable offer exists — the page must say so. */
   readonly offerId: string | null;
   readonly offerPriceEurCents: bigint | null;
@@ -128,6 +134,34 @@ function bestOfferSubquery(executor: Executor) {
     .as("best_offer");
 }
 
+/**
+ * Cheapest manually priced active variant per product.
+ *
+ * Manual pricing is deliberately independent of offers, retailers and FX: a
+ * product priced this way is sellable on its own.
+ */
+function manualPriceSubquery(executor: Executor) {
+  return executor
+    .select({
+      productId: productVariants.productId,
+      manualPriceToman: productVariants.manualPriceToman,
+      manualStockStatus: productVariants.manualStockStatus,
+      rank: sql<number>`row_number() over (
+        partition by ${productVariants.productId}
+        order by ${productVariants.manualPriceToman} asc
+      )`.as("manual_rank"),
+    })
+    .from(productVariants)
+    .where(
+      and(
+        eq(productVariants.status, "ACTIVE"),
+        sql`${productVariants.manualPriceToman} is not null`,
+        sql`coalesce(${productVariants.manualStockStatus}, 'IN_STOCK') in ('IN_STOCK', 'LOW_STOCK', 'PREORDER')`,
+      ),
+    )
+    .as("manual_price");
+}
+
 /** Primary image per product, one row each. */
 function primaryMediaSubquery(executor: Executor) {
   return executor
@@ -173,7 +207,11 @@ export async function listStorefrontProducts(
   filters: StorefrontFilters = {},
 ): Promise<readonly StorefrontProductRow[]> {
   const offer = bestOfferSubquery(executor);
+  const manual = manualPriceSubquery(executor);
   const media = primaryMediaSubquery(executor);
+
+  // A product is sellable if it is priced either way.
+  const sellable = sql`(${offer.offerId} is not null or ${manual.manualPriceToman} is not null)`;
 
   const conditions: SQL[] = [eq(products.status, "PUBLISHED")];
   if (filters.categorySlug !== undefined) {
@@ -183,7 +221,7 @@ export async function listStorefrontProducts(
     conditions.push(eq(brands.slug, filters.brandSlug));
   }
   if (filters.verifiedOnly === true) {
-    conditions.push(sql`${offer.offerId} is not null`);
+    conditions.push(sellable);
   }
   if (filters.discountOnly === true) {
     conditions.push(
@@ -206,15 +244,29 @@ export async function listStorefrontProducts(
         return [desc(products.publishedAt)];
       case "discount":
         return [desc(discountExpression), desc(products.publishedAt)];
+      // Manually priced products carry a real Toman price and sort on it.
+      // Offer-priced products have no Toman value in SQL (the FX rate lives in
+      // the application layer), so they sort after, on their EUR total. This is
+      // deterministic and never converts a currency with an invented rate.
       case "price-low":
-        return [asc(offer.totalEurCents), asc(products.titleFa)];
+        return [
+          sql`case when ${manual.manualPriceToman} is null then 1 else 0 end`,
+          asc(manual.manualPriceToman),
+          asc(offer.totalEurCents),
+          asc(products.titleFa),
+        ];
       case "price-high":
-        return [desc(offer.totalEurCents), asc(products.titleFa)];
+        return [
+          sql`case when ${manual.manualPriceToman} is null then 1 else 0 end`,
+          desc(manual.manualPriceToman),
+          desc(offer.totalEurCents),
+          asc(products.titleFa),
+        ];
       case "recommended":
       default:
-        // In-stock offers first, then the freshest catalog entries.
+        // Sellable products first, then the freshest catalog entries.
         return [
-          sql`case when ${offer.offerId} is null then 1 else 0 end`,
+          sql`case when ${offer.offerId} is null and ${manual.manualPriceToman} is null then 1 else 0 end`,
           desc(products.publishedAt),
         ];
     }
@@ -236,6 +288,8 @@ export async function listStorefrontProducts(
       categoryNameFa: categories.nameFa,
       categorySlug: categories.slug,
       categoryTransportClass: categories.defaultTransportClass,
+      manualPriceToman: manual.manualPriceToman,
+      manualStockStatus: manual.manualStockStatus,
       offerId: offer.offerId,
       offerPriceEurCents: offer.priceEurCents,
       offerShippingEurCents: offer.shippingEurCents,
@@ -251,6 +305,10 @@ export async function listStorefrontProducts(
     .innerJoin(brands, eq(brands.id, products.brandId))
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .leftJoin(offer, and(eq(offer.productId, products.id), eq(offer.rank, 1)))
+    .leftJoin(
+      manual,
+      and(eq(manual.productId, products.id), eq(manual.rank, 1)),
+    )
     .leftJoin(media, and(eq(media.productId, products.id), eq(media.rank, 1)))
     .where(and(...conditions))
     .orderBy(...orderBy)
@@ -264,6 +322,7 @@ export async function countStorefrontProducts(
   filters: StorefrontFilters = {},
 ): Promise<number> {
   const offer = bestOfferSubquery(executor);
+  const manual = manualPriceSubquery(executor);
 
   const conditions: SQL[] = [eq(products.status, "PUBLISHED")];
   if (filters.categorySlug !== undefined) {
@@ -273,7 +332,9 @@ export async function countStorefrontProducts(
     conditions.push(eq(brands.slug, filters.brandSlug));
   }
   if (filters.verifiedOnly === true) {
-    conditions.push(sql`${offer.offerId} is not null`);
+    conditions.push(
+      sql`(${offer.offerId} is not null or ${manual.manualPriceToman} is not null)`,
+    );
   }
   if (filters.discountOnly === true) {
     conditions.push(
@@ -290,6 +351,10 @@ export async function countStorefrontProducts(
     .innerJoin(brands, eq(brands.id, products.brandId))
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .leftJoin(offer, and(eq(offer.productId, products.id), eq(offer.rank, 1)))
+    .leftJoin(
+      manual,
+      and(eq(manual.productId, products.id), eq(manual.rank, 1)),
+    )
     .where(and(...conditions));
 
   return row?.value ?? 0;
@@ -302,6 +367,8 @@ export interface StorefrontVariantRow {
   readonly color: string | null;
   readonly volumeMl: number | null;
   readonly weightGramsOverride: number | null;
+  readonly manualPriceToman: bigint | null;
+  readonly manualStockStatus: StockStatus | null;
   readonly offerId: string | null;
   readonly offerPriceEurCents: bigint | null;
   readonly offerShippingEurCents: bigint | null;
@@ -355,6 +422,8 @@ export async function getStorefrontProduct(executor: Executor, slug: string) {
         color: productVariants.color,
         volumeMl: productVariants.volumeMl,
         weightGramsOverride: productVariants.weightGramsOverride,
+        manualPriceToman: productVariants.manualPriceToman,
+        manualStockStatus: productVariants.manualStockStatus,
         offerId: sourceOffers.id,
         offerPriceEurCents: sourceOffers.sourcePriceEurCents,
         offerShippingEurCents: sourceOffers.shippingEurCents,
@@ -493,6 +562,7 @@ export async function listStorefrontProductsBySlugs(
 ): Promise<readonly StorefrontProductRow[]> {
   if (slugs.length === 0) return [];
   const offer = bestOfferSubquery(executor);
+  const manual = manualPriceSubquery(executor);
   const media = primaryMediaSubquery(executor);
 
   const rows = (await executor
@@ -511,6 +581,8 @@ export async function listStorefrontProductsBySlugs(
       categoryNameFa: categories.nameFa,
       categorySlug: categories.slug,
       categoryTransportClass: categories.defaultTransportClass,
+      manualPriceToman: manual.manualPriceToman,
+      manualStockStatus: manual.manualStockStatus,
       offerId: offer.offerId,
       offerPriceEurCents: offer.priceEurCents,
       offerShippingEurCents: offer.shippingEurCents,
@@ -526,6 +598,10 @@ export async function listStorefrontProductsBySlugs(
     .innerJoin(brands, eq(brands.id, products.brandId))
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .leftJoin(offer, and(eq(offer.productId, products.id), eq(offer.rank, 1)))
+    .leftJoin(
+      manual,
+      and(eq(manual.productId, products.id), eq(manual.rank, 1)),
+    )
     .leftJoin(media, and(eq(media.productId, products.id), eq(media.rank, 1)))
     .where(
       and(eq(products.status, "PUBLISHED"), inArray(products.slug, [...slugs])),

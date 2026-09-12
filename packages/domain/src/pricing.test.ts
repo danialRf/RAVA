@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MoneyError } from "./money";
 import {
   estimatePrice,
+  manualPrice,
   PricingError,
   simulatePriceSensitivity,
   sourceDiscountBps,
@@ -182,5 +183,49 @@ describe("simulatePriceSensitivity", () => {
         scenario.breakdown.depositToman + scenario.breakdown.balanceToman,
       ).toBe(scenario.breakdown.estimatedToman);
     }
+  });
+});
+
+describe("manualPrice", () => {
+  const manualRule = {
+    depositBps: 3_500,
+    minDepositToman: 500_000n,
+    roundingUnitToman: 10_000n,
+  };
+
+  it("rejects a non-positive sell price", () => {
+    expect(() => manualPrice(0n, manualRule)).toThrow(PricingError);
+    expect(() => manualPrice(-1n, manualRule)).toThrow(PricingError);
+  });
+
+  it("sells pay-in-full when no deposit rule is configured", () => {
+    const result = manualPrice(4_500_000n, null);
+    expect(result.sellToman).toBe(4_500_000n);
+    expect(result.depositToman).toBe(4_500_000n);
+    expect(result.balanceToman).toBe(0n);
+  });
+
+  it("splits the total exactly, with no rounding leak", () => {
+    for (const total of [
+      1_000_000n,
+      2_345_678n,
+      9_999_999n,
+      120_000_000n,
+    ] as const) {
+      const result = manualPrice(total, manualRule);
+      expect(result.depositToman + result.balanceToman).toBe(total);
+      expect(result.depositToman).toBeGreaterThan(0n);
+      expect(result.balanceToman).toBeGreaterThanOrEqual(0n);
+    }
+  });
+
+  it("never asks for a deposit larger than the price itself", () => {
+    const result = manualPrice(200_000n, manualRule);
+    expect(result.depositToman).toBe(200_000n);
+    expect(result.balanceToman).toBe(0n);
+  });
+
+  it("keeps the price exactly as the operator entered it", () => {
+    expect(manualPrice(3_333_333n, manualRule).sellToman).toBe(3_333_333n);
   });
 });

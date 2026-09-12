@@ -635,3 +635,77 @@ test("uploads a card-to-card deposit receipt for review", async ({ page }) => {
     fullPage: true,
   });
 });
+
+/**
+ * The whole point of manual pricing: a shop owner adds a product, types a
+ * price, publishes it, and it is on sale. This test drives the real admin
+ * form in a browser, because the bug class this replaces was a form that
+ * typechecked perfectly and could not be submitted.
+ */
+test("puts a manually priced product on sale from the admin form", async ({
+  page,
+}) => {
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const email = `owner-manual-${suffix}@example.com`;
+  const password = "A-secure-owner-password-2026";
+  const handle = createDatabase();
+  try {
+    await handle.db.insert(users).values({
+      email,
+      displayName: "مدیر قیمت دستی",
+      passwordHash: await hashPassword(password),
+      emailVerifiedAt: new Date(),
+      role: "OWNER",
+    });
+  } finally {
+    await handle.close();
+  }
+
+  await page.goto("/account/login?next=%2Fadmin");
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill(password);
+  await page.locator("form.auth-form button").click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  await page.goto("/admin/catalog");
+  // The primary action must actually open the form, not merely scroll to it.
+  await page.getByRole("button", { name: "+ افزودن محصول" }).click();
+  const form = page.locator("#new-product-form form");
+  await expect(form.locator('input[name="titleFa"]')).toBeVisible();
+  await form.locator('input[name="titleFa"]').fill(`کالای آزمایشی ${suffix}`);
+  await form.locator('input[name="titleOriginal"]').fill(`Test Item ${suffix}`);
+  await form.locator('select[name="brandId"]').selectOption({ index: 1 });
+  await form.locator('select[name="categoryId"]').selectOption({ index: 1 });
+  await form.locator('input[name="priceToman"]').fill("4500000");
+  await form.locator('select[name="stockStatus"]').selectOption("IN_STOCK");
+  await form.locator('input[name="skuInternal"]').fill(`RAVA-E2E-${suffix}`);
+  await form.locator('input[name="image"]').setInputFiles({
+    name: "product.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  });
+  await form.locator('button[type="submit"], button.primary').first().click();
+
+  await expect(page).toHaveURL(/\/admin\/catalog\?notice=/);
+  const card = page.locator(".admin-product-card").filter({
+    hasText: `کالای آزمایشی ${suffix}`,
+  });
+  await expect(card).toHaveCount(1);
+  // The price the operator typed is what the list shows back.
+  await expect(card).toContainText("۴٬۵۰۰٬۰۰۰");
+
+  // Publishing it is one edit on the same card, not a trip to another screen.
+  await card.locator("summary").click();
+  const editForm = card.locator("form").first();
+  await editForm.locator('select[name="status"]').selectOption("PUBLISHED");
+  await editForm.locator("button.primary").click();
+  await expect(page).toHaveURL(/\/admin\/catalog\?notice=/);
+
+  const published = page.locator(".admin-product-card").filter({
+    hasText: `کالای آزمایشی ${suffix}`,
+  });
+  await expect(published).toContainText("منتشرشده");
+});

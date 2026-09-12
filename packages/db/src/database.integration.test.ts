@@ -26,6 +26,7 @@ import {
   completeGatewayPayment,
   consumeVerificationToken,
   createOrderFromQuote,
+  ensurePurchaseTasksForOrder,
   createPaymentIntent,
   decideOrderReconfirmation,
   ensureActiveCart,
@@ -154,6 +155,8 @@ describe("admin phase 6 management", () => {
       skuInternal: "RAVA-NEW-001",
       size: "M",
       color: "مشکی",
+      manualPriceToman: 4_500_000n,
+      manualStockStatus: "IN_STOCK",
       imageUrl: "https://cdn.example.com/product.webp",
       imageAlt: "تصویر محصول تازه",
     });
@@ -165,7 +168,12 @@ describe("admin phase 6 management", () => {
       .select()
       .from(productMedia)
       .where(sql`${productMedia.productId} = ${created.id}`);
-    expect(variant).toMatchObject({ skuInternal: "RAVA-NEW-001", size: "M" });
+    expect(variant).toMatchObject({
+      skuInternal: "RAVA-NEW-001",
+      size: "M",
+      manualPriceToman: 4_500_000n,
+      manualStockStatus: "IN_STOCK",
+    });
     expect(media).toMatchObject({
       kind: "PRIMARY",
       altTextFa: "تصویر محصول تازه",
@@ -1578,6 +1586,184 @@ describe("checkout repository", () => {
     });
   }
 
+  /**
+   * The manual-pricing path: a product priced in Toman by an operator, with no
+   * German source offer, no FX snapshot and no pricing rule, must be
+   * purchasable end to end while keeping every money invariant intact.
+   */
+  describe("manually priced products", () => {
+    async function createManualFixture() {
+      const catalog = await createCatalogFixture();
+      await db
+        .update(productVariants)
+        .set({ manualPriceToman: 4_500_000n, manualStockStatus: "IN_STOCK" })
+        .where(sql`${productVariants.id} = ${catalog.variant.id}`);
+      const user = await createUserWithPassword(db, {
+        email: "manual-buyer@example.com",
+        passwordHash: "$argon2id$test-only-hash",
+        displayName: null,
+      });
+      if (!user) throw new Error("User fixture failed");
+      const [address] = await db
+        .insert(addresses)
+        .values({
+          userId: user.id,
+          recipientName: "گیرنده آزمایشی",
+          phoneE164: "+989120000011",
+          province: "تهران",
+          city: "تهران",
+          addressLine: "خیابان نمونه",
+        })
+        .returning();
+      if (!address) throw new Error("Address fixture failed");
+      const cart = await ensureActiveCart(db, { userId: user.id });
+      return { ...catalog, user, address, cart };
+    }
+
+    function manualQuote(
+      fixture: Awaited<ReturnType<typeof createManualFixture>>,
+    ) {
+      return persistQuote(db, {
+        userId: fixture.user.id,
+        cartId: fixture.cart.id,
+        fxRateId: null,
+        fxTomanPerEur: null,
+        subtotalToman: 4_500_000n,
+        finalToman: 4_500_000n,
+        depositToman: 4_500_000n,
+        appliedRuleIds: [],
+        calculationVersion: "test-manual-v1",
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        lines: [
+          {
+            sourceOfferId: null,
+            productVariantId: fixture.variant.id,
+            quantity: 1,
+            sourcePriceEurCents: 0n,
+            shippingEurCents: 0n,
+            sourceTomanTotal: 4_500_000n,
+            transportToman: 0n,
+            customsRiskToman: 0n,
+            localDeliveryToman: 0n,
+            paymentFeeToman: 0n,
+            marginToman: 0n,
+            lineTotalToman: 4_500_000n,
+            observedAt: new Date(),
+            breakdown: {
+              titleFa: "کفش آدیداس سامبا",
+              titleOriginal: "Adidas Samba OG",
+              brand: "Adidas",
+              variant: "سایز ۴۲",
+              priceSource: "MANUAL",
+            },
+          },
+        ],
+      });
+    }
+
+    it("adds a manually priced variant to the cart with no source offer", async () => {
+      const fixture = await createManualFixture();
+      const added = await addCartItem(db, {
+        cartId: fixture.cart.id,
+        productVariantId: fixture.variant.id,
+        sourceOfferId: null,
+      });
+      expect(added).toBe(true);
+      const [item] = await db.select().from(cartItems);
+      expect(item?.sourceOfferId).toBeNull();
+    });
+
+    it("refuses an unpriced variant offered as manually priced", async () => {
+      const fixture = await createManualFixture();
+      await db
+        .update(productVariants)
+        .set({ manualPriceToman: null, manualStockStatus: null })
+        .where(sql`${productVariants.id} = ${fixture.variant.id}`);
+      const added = await addCartItem(db, {
+        cartId: fixture.cart.id,
+        productVariantId: fixture.variant.id,
+        sourceOfferId: null,
+      });
+      expect(added).toBe(false);
+      expect(await db.select().from(cartItems)).toHaveLength(0);
+    });
+
+    it("refuses a manually priced variant that is out of stock", async () => {
+      const fixture = await createManualFixture();
+      await db
+        .update(productVariants)
+        .set({ manualStockStatus: "OUT_OF_STOCK" })
+        .where(sql`${productVariants.id} = ${fixture.variant.id}`);
+      const added = await addCartItem(db, {
+        cartId: fixture.cart.id,
+        productVariantId: fixture.variant.id,
+        sourceOfferId: null,
+      });
+      expect(added).toBe(false);
+    });
+
+    it("locks an order from a manual quote without any FX snapshot", async () => {
+      const fixture = await createManualFixture();
+      const quote = await manualQuote(fixture);
+      expect(quote.fxRateId).toBeNull();
+
+      const order = await createOrderFromQuote(db, {
+        quoteId: quote.id,
+        userId: fixture.user.id,
+        addressId: fixture.address.id,
+      });
+      expect(order.totalLockedToman).toBe(4_500_000n);
+      expect(order.depositRequiredToman).toBe(4_500_000n);
+      expect(order.balanceDueToman).toBe(0n);
+
+      const [item] = await db.select().from(orderItems);
+      // Unknown stays unknown: no retailer, no source URL, no EUR ceiling.
+      expect(item?.offerSnapshot).toBeNull();
+      expect(item?.sourceOfferId).toBeNull();
+      expect(item?.maxSourcePriceEurCents).toBeNull();
+      expect(item?.lineTotalToman).toBe(4_500_000n);
+    });
+
+    it("refuses to lock an order after the operator changed the price", async () => {
+      const fixture = await createManualFixture();
+      const quote = await manualQuote(fixture);
+      await db
+        .update(productVariants)
+        .set({ manualPriceToman: 5_900_000n })
+        .where(sql`${productVariants.id} = ${fixture.variant.id}`);
+
+      await expect(
+        createOrderFromQuote(db, {
+          quoteId: quote.id,
+          userId: fixture.user.id,
+          addressId: fixture.address.id,
+        }),
+      ).rejects.toThrow("SOURCE_CHANGED");
+    });
+
+    it("creates no German purchase task for a manually priced order", async () => {
+      const fixture = await createManualFixture();
+      const quote = await manualQuote(fixture);
+      const order = await createOrderFromQuote(db, {
+        quoteId: quote.id,
+        userId: fixture.user.id,
+        addressId: fixture.address.id,
+      });
+      await ensurePurchaseTasksForOrder(db, order.id);
+      expect(await db.select().from(purchaseTasks)).toHaveLength(0);
+    });
+
+    it("rejects a zero or negative manual price at the database level", async () => {
+      const fixture = await createManualFixture();
+      await expect(
+        db
+          .update(productVariants)
+          .set({ manualPriceToman: 0n })
+          .where(sql`${productVariants.id} = ${fixture.variant.id}`),
+      ).rejects.toThrow();
+    });
+  });
+
   it("keeps a single active cart per owner", async () => {
     const fixture = await createCheckoutFixture();
     const again = await ensureActiveCart(db, { userId: fixture.user.id });
@@ -1704,7 +1890,7 @@ describe("checkout repository", () => {
     // The line snapshot is frozen onto the order, not re-read from the offer.
     const [item] = await db.select().from(orderItems);
     expect(item?.productSnapshot.titleFa).toBe("کفش آدیداس سامبا");
-    expect(item?.offerSnapshot.retailer).toBe("Demo Retailer");
+    expect(item?.offerSnapshot?.retailer).toBe("Demo Retailer");
   });
 
   it("refuses to reuse a consumed quote", async () => {

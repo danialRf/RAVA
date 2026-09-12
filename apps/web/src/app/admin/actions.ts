@@ -105,6 +105,25 @@ function toman(value: string, allowZero = true): bigint | null {
   return allowZero ? parsed : parsed > 0n ? parsed : null;
 }
 
+/**
+ * Sell price as a shop operator actually types it.
+ *
+ * Persian and Arabic-Indic digits, thousand separators and spaces are all
+ * accepted; anything else is rejected rather than guessed at. The result is
+ * integer Toman, never a float.
+ */
+function sellPriceToman(value: string): bigint | null {
+  const latin = value
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[,٬،.\s_]/g, "");
+  if (!/^\d{1,15}$/.test(latin)) return null;
+  const parsed = BigInt(latin);
+  return parsed > 0n ? parsed : null;
+}
+
+const STOCK_CHOICES = ["IN_STOCK", "LOW_STOCK", "PREORDER", "OUT_OF_STOCK"];
+
 function dateOrNull(value: string): Date | null {
   if (!value) return null;
   const parsed = new Date(value);
@@ -280,7 +299,11 @@ export async function updateProductAction(formData: FormData) {
   const weight = weightValue ? integer(weightValue, 1, 1_000_000) : null;
   const brandId = field(formData, "brandId");
   const categoryId = field(formData, "categoryId");
+  const priceValue = field(formData, "priceToman");
+  const price = priceValue ? sellPriceToman(priceValue) : null;
+  const stock = field(formData, "stockStatus") || "IN_STOCK";
   if (
+    !STOCK_CHOICES.includes(stock) ||
     !UUID.test(id) ||
     !["DRAFT", "NEEDS_REVIEW", "PUBLISHED", "ARCHIVED"].includes(status) ||
     !["", "XS", "S", "M", "L", "BLOCKED"].includes(transport) ||
@@ -289,6 +312,12 @@ export async function updateProductAction(formData: FormData) {
     (categoryId && !UUID.test(categoryId))
   )
     destination("/admin/catalog", "error", "اطلاعات محصول معتبر نیست.");
+  if (priceValue && price === null)
+    destination(
+      "/admin/catalog",
+      "error",
+      "قیمت فروش باید یک عدد صحیح به تومان باشد.",
+    );
   try {
     const storedImage = await productImage(formData, user.id);
     await updateAdminProduct(database(), {
@@ -303,6 +332,8 @@ export async function updateProductAction(formData: FormData) {
       weightGrams: weight,
       transportClass: (transport || null) as
         "XS" | "S" | "M" | "L" | "BLOCKED" | null,
+      manualPriceToman: price,
+      manualStockStatus: price === null ? null : (stock as "IN_STOCK"),
       imageUrl: storedImage?.publicUrl ?? null,
       imageAlt: field(formData, "imageAlt") || null,
     });
@@ -325,13 +356,23 @@ export async function createProductAction(formData: FormData) {
   const transport = field(formData, "transportClass");
   const weightValue = field(formData, "weightGrams");
   const weight = weightValue ? integer(weightValue, 1, 1_000_000) : null;
+  const priceValue = field(formData, "priceToman");
+  const price = priceValue ? sellPriceToman(priceValue) : null;
+  const stock = field(formData, "stockStatus") || "IN_STOCK";
   if (
     !UUID.test(brandId) ||
     !UUID.test(categoryId) ||
     !["", "XS", "S", "M", "L", "BLOCKED"].includes(transport) ||
-    (weightValue && weight === null)
+    (weightValue && weight === null) ||
+    !STOCK_CHOICES.includes(stock)
   )
     destination("/admin/catalog", "error", "اطلاعات محصول معتبر نیست.");
+  if (priceValue && price === null)
+    destination(
+      "/admin/catalog",
+      "error",
+      "قیمت فروش باید یک عدد صحیح به تومان باشد.",
+    );
   try {
     const storedImage = await productImage(formData, user.id);
     await createAdminProduct(database(), {
@@ -347,6 +388,8 @@ export async function createProductAction(formData: FormData) {
       skuInternal: field(formData, "skuInternal"),
       size: field(formData, "size") || null,
       color: field(formData, "color") || null,
+      manualPriceToman: price,
+      manualStockStatus: price === null ? null : (stock as "IN_STOCK"),
       imageUrl: storedImage?.publicUrl ?? null,
       imageAlt: field(formData, "imageAlt") || null,
     });

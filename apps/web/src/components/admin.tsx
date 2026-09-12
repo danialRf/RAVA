@@ -20,30 +20,32 @@ const NAVIGATION: ReadonlyArray<{
     items: [
       ["سفارش‌ها", "/admin/orders", "ORDERS_READ", "orders"],
       ["محصولات", "/admin/catalog", "CATALOG_READ", "products"],
-      ["مشتریان", "/admin/customers", "CUSTOMERS_READ", "customers"],
       ["پرداخت‌ها", "/admin/payments", "PAYMENTS_READ", "payment"],
-      ["درخواست‌های محصول", "/admin/requests", "REQUESTS_READ", "requests"],
+      ["مشتریان", "/admin/customers", "CUSTOMERS_READ", "customers"],
     ],
   },
   {
-    label: "خرید و ارسال",
+    label: "ارسال و تأمین",
     items: [
-      ["خریدهای آلمان", "/admin/procurement", "PROCUREMENT_READ", "truck"],
-      ["سفرها و حمل", "/admin/trips", "TRIPS_READ", "trips"],
+      ["ارسال سفارش‌ها", "/admin/trips", "TRIPS_READ", "trips"],
+      ["تهیه از آلمان", "/admin/procurement", "PROCUREMENT_READ", "truck"],
+      ["درخواست‌های مشتری", "/admin/requests", "REQUESTS_READ", "requests"],
     ],
   },
   {
     label: "سایت",
-    items: [["محتوا", "/admin/content", "CONTENT_READ", "content"]],
+    items: [["متن‌های سایت", "/admin/content", "CONTENT_READ", "content"]],
   },
+  // Everything below is real functionality that a shop assistant never needs
+  // on a normal day. It stays available, just out of the daily path.
   {
     label: "تنظیمات پیشرفته",
     items: [
-      ["قیمت و موجودی خرید", "/admin/offers", "CATALOG_READ", "offers"],
+      ["لینک‌های خرید از آلمان", "/admin/offers", "CATALOG_READ", "offers"],
       ["فروشگاه‌های آلمان", "/admin/sources", "SOURCES_READ", "store"],
-      ["قوانین قیمت‌گذاری", "/admin/pricing", "PRICING_READ", "pricing"],
+      ["قیمت‌گذاری خودکار", "/admin/pricing", "PRICING_READ", "pricing"],
       ["وضعیت سرویس‌ها", "/admin/health", "HEALTH_READ", "health"],
-      ["گزارش فعالیت‌ها", "/admin/audit", "AUDIT_READ", "history"],
+      ["تاریخچه فعالیت‌ها", "/admin/audit", "AUDIT_READ", "history"],
     ],
   },
 ];

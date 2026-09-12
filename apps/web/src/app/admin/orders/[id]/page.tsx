@@ -199,7 +199,10 @@ export default async function AdminOrderDetailsPage({
               <div>
                 <strong>{item.productSnapshot.titleFa}</strong>
                 <small dir="ltr">
-                  {item.productSnapshot.brand} · {item.offerSnapshot.retailer}
+                  {item.productSnapshot.brand}
+                  {item.offerSnapshot === null
+                    ? ""
+                    : ` · ${item.offerSnapshot.retailer}`}
                 </small>
               </div>
               <dl>

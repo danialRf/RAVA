@@ -5,6 +5,7 @@ import { cache } from "react";
 import { loadEnvironment } from "@rava/config";
 import {
   estimatePrice,
+  manualPrice,
   sourceDiscountBps,
   type EstimateBreakdown,
   type EstimateRule,
@@ -131,6 +132,11 @@ export interface EstimateSubject {
   readonly productId: string;
   readonly brandId: string;
   readonly categoryId: string;
+  /**
+   * Operator-set sell price in Toman. When present it wins outright: the
+   * source offer, the FX rate and the cost model are not consulted at all.
+   */
+  readonly manualPriceToman?: bigint | null;
   readonly sourcePriceEurCents: bigint | null;
   readonly shippingEurCents: bigint | null;
   readonly previousPriceEurCents: bigint | null;
@@ -139,13 +145,21 @@ export interface EstimateSubject {
   readonly categoryTransportClass: string | null;
 }
 
+/**
+ * A price RAVA can honestly show.
+ *
+ * `source` says where the number came from. A MANUAL price has no cost
+ * breakdown, no applied pricing rule and no FX observation, and those fields
+ * are null rather than filled with plausible-looking values.
+ */
 export interface PriceEstimate {
-  readonly ruleId: string;
+  readonly source: "MANUAL" | "SOURCE_OFFER";
+  readonly ruleId: string | null;
   readonly estimatedToman: bigint;
   readonly depositToman: bigint;
   readonly discountBps: number | null;
-  readonly rateObservedAt: Date;
-  readonly breakdown: EstimateBreakdown;
+  readonly rateObservedAt: Date | null;
+  readonly breakdown: EstimateBreakdown | null;
 }
 
 const TRANSPORT_CLASSES: readonly TransportClass[] = [
@@ -170,6 +184,34 @@ export async function estimateFor(
   subject: EstimateSubject,
   rate: StorefrontRate | null,
 ): Promise<PriceEstimate | null> {
+  // A manually priced item is sellable with no FX rate and no supplier offer.
+  if (subject.manualPriceToman != null && subject.manualPriceToman > 0n) {
+    const depositRule = selectPricingRule(await getActiveRules(), {
+      productId: subject.productId,
+      brandId: subject.brandId,
+      categoryId: subject.categoryId,
+    });
+    const split = manualPrice(
+      subject.manualPriceToman,
+      depositRule
+        ? {
+            depositBps: depositRule.depositBps,
+            minDepositToman: depositRule.minDepositToman,
+            roundingUnitToman: depositRule.roundingUnitToman,
+          }
+        : null,
+    );
+    return {
+      source: "MANUAL",
+      ruleId: depositRule?.id ?? null,
+      estimatedToman: split.sellToman,
+      depositToman: split.depositToman,
+      discountBps: null,
+      rateObservedAt: null,
+      breakdown: null,
+    };
+  }
+
   if (rate === null || subject.sourcePriceEurCents === null) return null;
 
   const rule = selectPricingRule(await getActiveRules(), {
@@ -206,6 +248,7 @@ export async function estimateFor(
   });
 
   return {
+    source: "SOURCE_OFFER",
     ruleId: rule.id,
     estimatedToman: breakdown.estimatedToman,
     depositToman: breakdown.depositToman,

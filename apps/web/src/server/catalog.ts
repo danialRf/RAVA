@@ -67,6 +67,7 @@ async function toCardModel(
       productId: row.id,
       brandId: row.brandId,
       categoryId: row.categoryId,
+      manualPriceToman: row.manualPriceToman,
       sourcePriceEurCents: row.offerPriceEurCents,
       shippingEurCents: row.offerShippingEurCents,
       previousPriceEurCents: row.offerPreviousPriceEurCents,
@@ -88,10 +89,13 @@ async function toCardModel(
     categorySlug: row.categorySlug,
     imageUrl: row.imageUrl ?? FALLBACK_IMAGE,
     imageAlt: row.imageAlt ?? row.titleFa,
-    retailerName: row.retailerName,
-    trustTier: row.retailerTrustTier,
-    stockStatus: row.offerStockStatus,
-    observedAt: row.offerObservedAt,
+    retailerName: row.manualPriceToman === null ? row.retailerName : null,
+    trustTier: row.manualPriceToman === null ? row.retailerTrustTier : null,
+    stockStatus:
+      row.manualPriceToman === null
+        ? row.offerStockStatus
+        : (row.manualStockStatus ?? "IN_STOCK"),
+    observedAt: row.manualPriceToman === null ? row.offerObservedAt : null,
     estimate,
   };
 }
@@ -199,6 +203,7 @@ export const getProductDetail = cache(
             productId: product.id,
             brandId: product.brandId,
             categoryId: product.categoryId,
+            manualPriceToman: variant.manualPriceToman,
             sourcePriceEurCents: variant.offerPriceEurCents,
             shippingEurCents: variant.offerShippingEurCents,
             previousPriceEurCents: variant.offerPreviousPriceEurCents,
@@ -209,16 +214,21 @@ export const getProductDetail = cache(
           rate,
         );
 
+        // A manually priced variant is purchasable on its own; the retailer
+        // fields stay null because no supplier was involved.
+        const manual = variant.manualPriceToman !== null;
         return {
           id: variant.id,
-          sourceOfferId: variant.offerId,
+          sourceOfferId: manual ? null : variant.offerId,
           skuInternal: variant.skuInternal,
           label: variantLabel(variant),
-          available: variant.offerId !== null,
-          stockStatus: variant.offerStockStatus,
-          retailerName: variant.retailerName,
-          trustTier: variant.retailerTrustTier,
-          observedAt: variant.offerObservedAt,
+          available: manual ? estimate !== null : variant.offerId !== null,
+          stockStatus: manual
+            ? (variant.manualStockStatus ?? "IN_STOCK")
+            : variant.offerStockStatus,
+          retailerName: manual ? null : variant.retailerName,
+          trustTier: manual ? null : variant.retailerTrustTier,
+          observedAt: manual ? null : variant.offerObservedAt,
           estimate,
         };
       }),

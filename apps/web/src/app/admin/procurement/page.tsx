@@ -88,13 +88,19 @@ export default async function AdminProcurementPage({
                   <dd>{formatDate(item.createdAt)}</dd>
                 </div>
               </dl>
-              <a
-                href={item.offerSnapshot.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                بازکردن منبع خرید
-              </a>
+              {item.offerSnapshot === null ? (
+                <p className="admin-form-help">
+                  این کالا قیمت دستی دارد و از فروشگاه آلمانی تأمین نمی‌شود.
+                </p>
+              ) : (
+                <a
+                  href={item.offerSnapshot.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  بازکردن منبع خرید
+                </a>
+              )}
               {hasAdminPermission(user.role, "PROCUREMENT_WRITE") &&
                 item.taskStatus && (
                   <form

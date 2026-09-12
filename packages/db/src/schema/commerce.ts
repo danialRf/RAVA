@@ -182,14 +182,13 @@ export const orderItems = pgTable(
         readonly variant: Record<string, string>;
       }>()
       .notNull(),
-    offerSnapshot: jsonb("offer_snapshot")
-      .$type<{
-        readonly retailer: string;
-        readonly sourceUrl: string;
-        readonly priceEurCents: string;
-        readonly observedAt: string;
-      }>()
-      .notNull(),
+    /** Null for a manually priced line: no source offer was involved. */
+    offerSnapshot: jsonb("offer_snapshot").$type<{
+      readonly retailer: string;
+      readonly sourceUrl: string;
+      readonly priceEurCents: string;
+      readonly observedAt: string;
+    }>(),
     quantity: integer("quantity").notNull(),
     unitTotalToman: tomanAmount("unit_total_toman").notNull(),
     lineTotalToman: tomanAmount("line_total_toman").notNull(),

@@ -166,10 +166,14 @@ export const quotes = pgTable(
       onDelete: "set null",
     }),
     cartId: uuid("cart_id"),
-    fxRateId: uuid("fx_rate_id")
-      .notNull()
-      .references(() => fxRates.id, { onDelete: "restrict" }),
-    fxTomanPerEur: tomanAmount("fx_toman_per_eur").notNull(),
+    /**
+     * Null for a quote whose lines are all manually priced in Toman: there is
+     * no EUR conversion to snapshot, and inventing one would be a lie.
+     */
+    fxRateId: uuid("fx_rate_id").references(() => fxRates.id, {
+      onDelete: "restrict",
+    }),
+    fxTomanPerEur: tomanAmount("fx_toman_per_eur"),
     subtotalToman: tomanAmount("subtotal_toman").notNull(),
     finalToman: tomanAmount("final_toman").notNull(),
     depositToman: tomanAmount("deposit_toman").notNull(),

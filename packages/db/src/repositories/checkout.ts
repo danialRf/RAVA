@@ -148,30 +148,53 @@ export async function addCartItem(
   input: {
     readonly cartId: string;
     readonly productVariantId: string;
-    readonly sourceOfferId: string;
+    /** Null for a manually priced variant, which has no supplier offer. */
+    readonly sourceOfferId: string | null;
     readonly quantity?: number;
   },
 ): Promise<boolean> {
   const quantity = Math.min(10, Math.max(1, Math.trunc(input.quantity ?? 1)));
-  const [candidate] = await executor
-    .select({ variantId: productVariants.id })
-    .from(productVariants)
-    .innerJoin(
-      sourceOffers,
-      and(
-        eq(sourceOffers.id, input.sourceOfferId),
-        eq(sourceOffers.productVariantId, productVariants.id),
-      ),
-    )
-    .where(
-      and(
-        eq(productVariants.id, input.productVariantId),
-        eq(productVariants.status, "ACTIVE"),
-        eq(sourceOffers.sourceVerified, true),
-        sql`${sourceOffers.stockStatus} in ('IN_STOCK', 'LOW_STOCK')`,
-      ),
-    )
-    .limit(1);
+  const offerId = input.sourceOfferId;
+
+  // Two ways a variant can be purchasable, checked server-side either way:
+  // a manual Toman price set by an operator, or a verified in-stock offer.
+  const candidate =
+    offerId === null
+      ? (
+          await executor
+            .select({ variantId: productVariants.id })
+            .from(productVariants)
+            .where(
+              and(
+                eq(productVariants.id, input.productVariantId),
+                eq(productVariants.status, "ACTIVE"),
+                sql`${productVariants.manualPriceToman} is not null`,
+                sql`coalesce(${productVariants.manualStockStatus}, 'IN_STOCK') in ('IN_STOCK', 'LOW_STOCK', 'PREORDER')`,
+              ),
+            )
+            .limit(1)
+        )[0]
+      : (
+          await executor
+            .select({ variantId: productVariants.id })
+            .from(productVariants)
+            .innerJoin(
+              sourceOffers,
+              and(
+                eq(sourceOffers.id, offerId),
+                eq(sourceOffers.productVariantId, productVariants.id),
+              ),
+            )
+            .where(
+              and(
+                eq(productVariants.id, input.productVariantId),
+                eq(productVariants.status, "ACTIVE"),
+                eq(sourceOffers.sourceVerified, true),
+                sql`${sourceOffers.stockStatus} in ('IN_STOCK', 'LOW_STOCK')`,
+              ),
+            )
+            .limit(1)
+        )[0];
   if (!candidate) return false;
 
   await executor
@@ -179,13 +202,13 @@ export async function addCartItem(
     .values({
       cartId: input.cartId,
       productVariantId: input.productVariantId,
-      sourceOfferId: input.sourceOfferId,
+      sourceOfferId: offerId,
       quantity,
     })
     .onConflictDoUpdate({
       target: [cartItems.cartId, cartItems.productVariantId],
       set: {
-        sourceOfferId: input.sourceOfferId,
+        sourceOfferId: offerId,
         quantity: sql`least(10, ${cartItems.quantity} + ${quantity})`,
         updatedAt: new Date(),
       },
@@ -226,61 +249,70 @@ export async function removeCartItem(
 }
 
 export async function listCartDetails(executor: Executor, cartId: string) {
-  return executor
-    .select({
-      itemId: cartItems.id,
-      cartId: cartItems.cartId,
-      quantity: cartItems.quantity,
-      variantId: productVariants.id,
-      variantSize: productVariants.size,
-      variantColor: productVariants.color,
-      variantVolumeMl: productVariants.volumeMl,
-      variantSku: productVariants.skuInternal,
-      productId: products.id,
-      productSlug: products.slug,
-      titleFa: products.titleFa,
-      titleOriginal: products.titleOriginal,
-      weightGrams: products.weightGrams,
-      transportClass: products.transportClass,
-      brandId: brands.id,
-      brandName: brands.name,
-      categoryId: categories.id,
-      categoryNameFa: categories.nameFa,
-      categoryTransportClass: categories.defaultTransportClass,
-      imageUrl: productMedia.sourceUrl,
-      offerId: sourceOffers.id,
-      sourceUrl: sourceOffers.sourceUrl,
-      sourcePriceEurCents: sourceOffers.sourcePriceEurCents,
-      shippingEurCents: sourceOffers.shippingEurCents,
-      stockStatus: sourceOffers.stockStatus,
-      sourceVerified: sourceOffers.sourceVerified,
-      observedAt: sourceOffers.lastSeenAt,
-      retailerName: retailers.name,
-      retailerTrustTier: retailers.trustTier,
-    })
-    .from(cartItems)
-    .innerJoin(
-      productVariants,
-      eq(cartItems.productVariantId, productVariants.id),
-    )
-    .innerJoin(products, eq(productVariants.productId, products.id))
-    .innerJoin(brands, eq(products.brandId, brands.id))
-    .innerJoin(categories, eq(products.categoryId, categories.id))
-    .innerJoin(sourceOffers, eq(cartItems.sourceOfferId, sourceOffers.id))
-    .innerJoin(retailers, eq(sourceOffers.retailerId, retailers.id))
-    .leftJoin(
-      productMedia,
-      and(
-        eq(productMedia.productId, products.id),
-        eq(productMedia.kind, "PRIMARY"),
-      ),
-    )
-    .where(eq(cartItems.cartId, cartId))
-    .orderBy(cartItems.createdAt);
+  return (
+    executor
+      .select({
+        itemId: cartItems.id,
+        cartId: cartItems.cartId,
+        quantity: cartItems.quantity,
+        variantId: productVariants.id,
+        variantSize: productVariants.size,
+        variantColor: productVariants.color,
+        variantVolumeMl: productVariants.volumeMl,
+        variantSku: productVariants.skuInternal,
+        productId: products.id,
+        productSlug: products.slug,
+        titleFa: products.titleFa,
+        titleOriginal: products.titleOriginal,
+        weightGrams: products.weightGrams,
+        transportClass: products.transportClass,
+        brandId: brands.id,
+        brandName: brands.name,
+        categoryId: categories.id,
+        categoryNameFa: categories.nameFa,
+        categoryTransportClass: categories.defaultTransportClass,
+        imageUrl: sql<
+          string | null
+        >`coalesce(${productMedia.storageKey}, ${productMedia.sourceUrl})`,
+        manualPriceToman: productVariants.manualPriceToman,
+        manualStockStatus: productVariants.manualStockStatus,
+        offerId: sourceOffers.id,
+        sourceUrl: sourceOffers.sourceUrl,
+        sourcePriceEurCents: sourceOffers.sourcePriceEurCents,
+        shippingEurCents: sourceOffers.shippingEurCents,
+        stockStatus: sourceOffers.stockStatus,
+        sourceVerified: sourceOffers.sourceVerified,
+        observedAt: sourceOffers.lastSeenAt,
+        retailerName: retailers.name,
+        retailerTrustTier: retailers.trustTier,
+      })
+      .from(cartItems)
+      .innerJoin(
+        productVariants,
+        eq(cartItems.productVariantId, productVariants.id),
+      )
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .innerJoin(brands, eq(products.brandId, brands.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      // Left joins: a manually priced line has no offer and no retailer, and
+      // must still appear in the cart.
+      .leftJoin(sourceOffers, eq(cartItems.sourceOfferId, sourceOffers.id))
+      .leftJoin(retailers, eq(sourceOffers.retailerId, retailers.id))
+      .leftJoin(
+        productMedia,
+        and(
+          eq(productMedia.productId, products.id),
+          eq(productMedia.kind, "PRIMARY"),
+        ),
+      )
+      .where(eq(cartItems.cartId, cartId))
+      .orderBy(cartItems.createdAt)
+  );
 }
 
 export interface QuoteLineSnapshot {
-  readonly sourceOfferId: string;
+  /** Null for a manually priced line. */
+  readonly sourceOfferId: string | null;
   readonly productVariantId: string;
   readonly quantity: number;
   readonly sourcePriceEurCents: bigint;
@@ -292,6 +324,7 @@ export interface QuoteLineSnapshot {
   readonly paymentFeeToman: bigint;
   readonly marginToman: bigint;
   readonly lineTotalToman: bigint;
+  /** For a manual line this is the moment the price was quoted. */
   readonly observedAt: Date;
   readonly breakdown: Record<string, string>;
 }
@@ -301,8 +334,9 @@ export async function persistQuote(
   input: {
     readonly userId: string;
     readonly cartId: string;
-    readonly fxRateId: string;
-    readonly fxTomanPerEur: bigint;
+    /** Null when every line is manually priced: there is no EUR leg. */
+    readonly fxRateId: string | null;
+    readonly fxTomanPerEur: bigint | null;
     readonly subtotalToman: bigint;
     readonly finalToman: bigint;
     readonly depositToman: bigint;
@@ -384,10 +418,36 @@ export async function createOrderFromQuote(
     if (lines.length === 0) throw new Error("QUOTE_EMPTY");
 
     for (const line of lines) {
+      // A manually priced line is re-verified against the variant's own price,
+      // so a price the operator changed after quoting cannot be locked in.
+      if (line.sourceOfferId === null) {
+        const [variant] = await tx
+          .select({
+            manualPriceToman: productVariants.manualPriceToman,
+            manualStockStatus: productVariants.manualStockStatus,
+            status: productVariants.status,
+          })
+          .from(productVariants)
+          .where(eq(productVariants.id, line.productVariantId!))
+          .limit(1);
+        const unitToman = line.lineTotalToman / BigInt(line.quantity);
+        if (
+          !variant ||
+          variant.status !== "ACTIVE" ||
+          variant.manualPriceToman === null ||
+          variant.manualPriceToman !== unitToman ||
+          !["IN_STOCK", "LOW_STOCK", "PREORDER"].includes(
+            variant.manualStockStatus ?? "IN_STOCK",
+          )
+        ) {
+          throw new Error("SOURCE_CHANGED");
+        }
+        continue;
+      }
       const [offer] = await tx
         .select()
         .from(sourceOffers)
-        .where(eq(sourceOffers.id, line.sourceOfferId!))
+        .where(eq(sourceOffers.id, line.sourceOfferId))
         .limit(1);
       if (
         !offer ||
@@ -428,16 +488,22 @@ export async function createOrderFromQuote(
           brand: line.breakdown.brand ?? "",
           variant: { label: line.breakdown.variant ?? "" },
         },
-        offerSnapshot: {
-          retailer: line.breakdown.retailer ?? "",
-          sourceUrl: line.breakdown.sourceUrl ?? "",
-          priceEurCents: line.sourcePriceEurCents.toString(),
-          observedAt: line.observedAt.toISOString(),
-        },
+        // Null rather than a blank retailer: a manually priced line genuinely
+        // had no supplier offer, and unknown must stay unknown.
+        offerSnapshot:
+          line.sourceOfferId === null
+            ? null
+            : {
+                retailer: line.breakdown.retailer ?? "",
+                sourceUrl: line.breakdown.sourceUrl ?? "",
+                priceEurCents: line.sourcePriceEurCents.toString(),
+                observedAt: line.observedAt.toISOString(),
+              },
         quantity: line.quantity,
         unitTotalToman: line.lineTotalToman / BigInt(line.quantity),
         lineTotalToman: line.lineTotalToman,
-        maxSourcePriceEurCents: line.sourcePriceEurCents,
+        maxSourcePriceEurCents:
+          line.sourceOfferId === null ? null : line.sourcePriceEurCents,
         sourceStockStatus: "IN_STOCK" as const,
       })),
     );

@@ -2,8 +2,9 @@ import {
   assertOrderTransition,
   orderStateMachine,
   tripStateMachine,
+  type StockStatus,
 } from "@rava/domain";
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -69,12 +70,24 @@ export async function updateAdminProduct(
     status: "DRAFT" | "NEEDS_REVIEW" | "PUBLISHED" | "ARCHIVED";
     weightGrams: number | null;
     transportClass: "XS" | "S" | "M" | "L" | "BLOCKED" | null;
+    /**
+     * Sell price for the product's default variant, in integer Toman.
+     * `undefined` leaves the current price untouched; `null` clears it and
+     * returns the product to source-offer pricing.
+     */
+    manualPriceToman?: bigint | null;
+    manualStockStatus?: StockStatus | null;
     imageUrl?: string | null;
     imageAlt?: string | null;
   },
 ) {
   const title = input.titleFa.trim();
-  if (title.length < 2 || title.length > 200 || (input.weightGrams ?? 1) <= 0) {
+  if (
+    title.length < 2 ||
+    title.length > 200 ||
+    (input.weightGrams ?? 1) <= 0 ||
+    (input.manualPriceToman != null && input.manualPriceToman <= 0n)
+  ) {
     throw new AdminOperationError("PRODUCT_INPUT_INVALID");
   }
   return db.transaction(async (tx) => {
@@ -101,6 +114,31 @@ export async function updateAdminProduct(
       updatedAt: new Date(),
     };
     await tx.update(products).set(after).where(eq(products.id, input.id));
+
+    // The price lives on the default (oldest) variant, which is the one the
+    // simplified product form creates and edits.
+    if (input.manualPriceToman !== undefined) {
+      const [defaultVariant] = await tx
+        .select({ id: productVariants.id })
+        .from(productVariants)
+        .where(eq(productVariants.productId, input.id))
+        .orderBy(asc(productVariants.createdAt))
+        .limit(1);
+      if (defaultVariant) {
+        await tx
+          .update(productVariants)
+          .set({
+            manualPriceToman: input.manualPriceToman,
+            manualStockStatus:
+              input.manualPriceToman === null
+                ? null
+                : (input.manualStockStatus ?? "IN_STOCK"),
+            updatedAt: new Date(),
+          })
+          .where(eq(productVariants.id, defaultVariant.id));
+      }
+    }
+
     if (input.imageUrl) {
       await tx
         .update(productMedia)
@@ -151,6 +189,9 @@ export async function createAdminProduct(
     skuInternal: string;
     size: string | null;
     color: string | null;
+    /** Operator-set sell price in integer Toman. Null keeps the product unpriced. */
+    manualPriceToman: bigint | null;
+    manualStockStatus: StockStatus | null;
     imageUrl: string | null;
     imageAlt: string | null;
   },
@@ -162,7 +203,8 @@ export async function createAdminProduct(
     titleFa.length < 2 ||
     titleOriginal.length < 2 ||
     sku.length < 2 ||
-    (input.weightGrams ?? 1) <= 0
+    (input.weightGrams ?? 1) <= 0 ||
+    (input.manualPriceToman !== null && input.manualPriceToman <= 0n)
   )
     throw new AdminOperationError("PRODUCT_INPUT_INVALID");
 
@@ -201,6 +243,11 @@ export async function createAdminProduct(
       skuInternal: sku,
       size: input.size?.trim() || null,
       color: input.color?.trim() || null,
+      manualPriceToman: input.manualPriceToman,
+      manualStockStatus:
+        input.manualPriceToman === null
+          ? null
+          : (input.manualStockStatus ?? "IN_STOCK"),
     });
     if (input.imageUrl)
       await tx.insert(productMedia).values({

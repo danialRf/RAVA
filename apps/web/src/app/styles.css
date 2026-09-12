@@ -1972,8 +1972,18 @@ p {
 }
 
 .admin-create-panel {
-  margin-block: 1.25rem;
-  padding: 1rem;
+  margin-block: 1rem;
+  padding: 0.7rem;
+}
+/* Collapsed, the panel is just its button: a bordered empty strip around one
+   button reads as a broken card. */
+.admin-create-panel[data-open="false"] {
+  border: 0;
+  background: none;
+  padding: 0;
+}
+.admin-create-panel > [hidden] {
+  display: none;
 }
 
 .admin-create-panel > summary,
@@ -2098,20 +2108,32 @@ p {
   overflow: hidden;
 }
 .admin-product-card > summary {
-  min-height: 5.5rem;
-  padding: 0.75rem;
+  min-height: 4.5rem;
+  padding: 0.7rem 0.75rem;
   display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  /* Thumb, title, price, status: four cells, four columns. With three the
+     price wrapped onto its own row and every card grew a blank half. */
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.75rem;
   cursor: pointer;
   list-style: none;
 }
+.admin-product-price {
+  text-align: start;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.admin-product-price[data-unpriced="true"] {
+  color: var(--admin-muted);
+  font-weight: 500;
+}
 .admin-product-card > summary::-webkit-details-marker {
   display: none;
 }
 .admin-product-thumb {
-  width: 4rem;
+  width: 3.25rem;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -2154,13 +2176,16 @@ p {
     width: 100%;
   }
   .admin-product-card > summary {
-    grid-template-columns: 3.5rem minmax(0, 1fr);
+    grid-template-columns: 3rem minmax(0, 1fr);
   }
   .admin-product-thumb {
-    width: 3.5rem;
+    width: 3rem;
   }
   .admin-product-card > summary > :nth-last-child(-n + 2) {
     grid-column: 2;
+  }
+  .admin-product-price {
+    font-size: 0.78rem;
   }
 }
 .admin-action-row {

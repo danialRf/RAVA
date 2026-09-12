@@ -12,10 +12,17 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { createdAt, moment, primaryId, updatedAt } from "./columns";
+import {
+  createdAt,
+  moment,
+  primaryId,
+  tomanAmount,
+  updatedAt,
+} from "./columns";
 import {
   mediaKindEnum,
   productStatusEnum,
+  stockStatusEnum,
   transportClassEnum,
   variantStatusEnum,
 } from "./enums";
@@ -148,6 +155,16 @@ export const productVariants = pgTable(
       .notNull()
       .default({}),
     weightGramsOverride: integer("weight_grams_override"),
+    /**
+     * Operator-set sell price in integer Toman.
+     *
+     * When present this variant is priced directly by RAVA and no German
+     * source offer, pricing rule or FX snapshot is consulted. Null means the
+     * variant is priced from its best source offer, as before.
+     */
+    manualPriceToman: tomanAmount("manual_price_toman"),
+    /** Operator-set availability, used only alongside a manual price. */
+    manualStockStatus: stockStatusEnum("manual_stock_status"),
     status: variantStatusEnum("status").notNull().default("ACTIVE"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -166,6 +183,13 @@ export const productVariants = pgTable(
       "product_variants_volume_positive",
       sql`${table.volumeMl} is null or ${table.volumeMl} > 0`,
     ),
+    check(
+      "product_variants_manual_price_positive",
+      sql`${table.manualPriceToman} is null or ${table.manualPriceToman} > 0`,
+    ),
+    index("product_variants_manual_price_idx")
+      .on(table.productId, table.manualPriceToman)
+      .where(sql`${table.manualPriceToman} is not null`),
   ],
 );
 

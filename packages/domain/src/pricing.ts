@@ -219,3 +219,59 @@ export function sourceDiscountBps(
   const dropped = previousEurCents - currentEurCents;
   return Number(divideRoundHalfUp(dropped * BPS_DENOMINATOR, previousEurCents));
 }
+
+/**
+ * Manual Toman pricing.
+ *
+ * A RAVA operator may set a product's sell price directly instead of deriving
+ * it from a German source offer. This is a first-class pricing mode, not a
+ * bypass: the number is still integer Toman, the deposit split still comes
+ * from the configured rule, and the result is still a locked, explainable
+ * total. What it deliberately does NOT contain is a source price, an FX rate
+ * or a cost breakdown, because for a manually priced item those are genuinely
+ * unknown and must not be invented.
+ */
+export interface ManualPriceRule {
+  readonly depositBps: number;
+  readonly minDepositToman: Toman;
+  readonly roundingUnitToman: Toman;
+}
+
+export interface ManualPriceBreakdown {
+  readonly sellToman: Toman;
+  readonly depositToman: Toman;
+  readonly balanceToman: Toman;
+}
+
+/**
+ * Deposit split for an operator-entered sell price.
+ *
+ * With no rule the item is sold as pay-in-full: the deposit equals the total,
+ * which is the only honest default when no deposit policy is configured.
+ */
+export function manualPrice(
+  sellToman: Toman,
+  rule?: ManualPriceRule | null,
+): ManualPriceBreakdown {
+  if (sellToman <= 0n) {
+    throw new PricingError("Manual sell price must be positive");
+  }
+  if (!rule) {
+    return {
+      sellToman,
+      depositToman: sellToman,
+      balanceToman: 0n,
+    };
+  }
+  const depositToman = depositAmount({
+    total: sellToman,
+    depositBps: rule.depositBps,
+    minimumToman: rule.minDepositToman,
+    roundingUnit: rule.roundingUnitToman,
+  });
+  return {
+    sellToman,
+    depositToman,
+    balanceToman: sellToman - depositToman,
+  };
+}
